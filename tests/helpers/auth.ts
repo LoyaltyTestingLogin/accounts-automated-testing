@@ -52,7 +52,7 @@ export async function loginWithPassword(page: Page, email?: string, password?: s
   
   console.log('🔐 SCHRITT 2: Gebe Passwort ein...');
   await page.waitForTimeout(500); // Kürzere Pause vor Eingabe
-  await passwordInput.fill(testPassword + 'XX', { force: true }); // ABSICHTLICH FALSCH für Test
+  await passwordInput.fill(testPassword, { force: true });
   await page.waitForTimeout(2000); // Längere Pause nach Passwort - damit Button bereit ist
 
   // Klick auf "Anmelden"-Button (finaler Submit)
@@ -161,4 +161,87 @@ export async function logout(page: Page) {
     await logoutButton.click();
     await page.waitForLoadState('networkidle');
   }
+}
+
+/**
+ * Login-Challenge Handler (2FA TAN-Code)
+ * Behandelt die TAN-Eingabe nach dem initialen Login
+ */
+export async function handleLoginChallenge(page: Page): Promise<boolean> {
+  const { getEmailClient } = await import('./email');
+  
+  console.log('🔐 Prüfe auf Login-Challenge...');
+  
+  // Prüfe ob Login-Challenge erscheint (TAN-Eingabe)
+  const tanInputSelectors = [
+    'input[name*="tan"]',
+    'input[name*="code"]',
+    'input[name*="otp"]',
+    'input[placeholder*="Code"]',
+    'input[placeholder*="TAN"]',
+    'input[type="text"][inputmode="numeric"]',
+  ];
+
+  let tanInput = null;
+  
+  // Warte kurz ob Challenge-Seite erscheint
+  await page.waitForTimeout(2000);
+
+  for (const selector of tanInputSelectors) {
+    const locator = page.locator(selector).first();
+    if (await locator.count() > 0 && await locator.isVisible()) {
+      tanInput = locator;
+      console.log(`✅ TAN-Eingabefeld gefunden: ${selector}`);
+      break;
+    }
+  }
+
+  if (!tanInput) {
+    console.log('ℹ️  Keine Login-Challenge erkannt - möglicherweise nicht erforderlich');
+    return false;
+  }
+
+  console.log('📧 Login-Challenge erkannt! Warte auf TAN-Code per E-Mail...');
+
+  // E-Mail Client initialisieren
+  const emailClient = getEmailClient();
+
+  // Auf E-Mail mit TAN-Code warten
+  const tanCode = await emailClient.waitForTanCode(
+    {
+      subject: 'CHECK24', // Anpassen an tatsächlichen Betreff
+      // from: 'noreply@check24.de' // Optional: Absender filtern
+    },
+    90000 // 90 Sekunden Timeout
+  );
+
+  if (!tanCode) {
+    throw new Error('TAN-Code konnte nicht aus E-Mail extrahiert werden');
+  }
+
+  console.log(`🔑 TAN-Code erhalten: ${tanCode}`);
+
+  // TAN-Code eingeben
+  await page.waitForTimeout(1000);
+  await tanInput.fill(tanCode);
+  await page.waitForTimeout(1500);
+
+  console.log('✅ TAN-Code eingegeben');
+
+  // Submit-Button finden und klicken
+  const submitButton = page.locator('button[type="submit"], button:has-text("Bestätigen"), button:has-text("Weiter")').first();
+  
+  if (await submitButton.count() > 0) {
+    console.log('➡️  Klicke auf Bestätigen-Button...');
+    await submitButton.click({ force: true });
+    await page.waitForTimeout(2000);
+  } else {
+    // Fallback: Enter drücken
+    console.log('⌨️  Drücke Enter (kein Submit-Button gefunden)...');
+    await tanInput.press('Enter');
+    await page.waitForTimeout(2000);
+  }
+
+  console.log('✅ Login-Challenge abgeschlossen');
+  return true;
 }

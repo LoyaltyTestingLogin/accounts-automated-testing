@@ -199,6 +199,60 @@ Der Worker führt automatisch Tests in konfigurierbaren Intervallen aus:
    curl -X POST http://localhost:4000/api/test-slack
    ```
 
+### 2FA Login-Challenge (Microsoft Graph API)
+
+Die automatische Behandlung von TAN-Codes per E-Mail ist **bereits eingerichtet**.
+
+**Azure App Registration Details:**
+- **App Name**: ExO RBAC Factory
+- **Application (Client) ID**: `56ec444f-3c78-4925-8da4-a5514140f0a4`
+- **Directory (Tenant) ID**: `04b9d98f-14cb-46a5-b5a7-a5141ddfa7ae`
+- **Client Secret ID**: `fa7b4392-34e8-474c-8e93-3f1525a756d4`
+- **E-Mail Account**: `loyaltytesting@check24.de`
+- **Permissions**: `Mail.Read` (Application permission, Admin consent erteilt)
+
+Die Credentials sind bereits in der `.env` Datei konfiguriert.
+
+**Bei Problemen:**
+1. Prüfe ob Admin Consent erteilt wurde (grünes Häkchen bei Mail.Read Permission)
+2. Prüfe ob das Client Secret nicht abgelaufen ist
+3. Teste mit: `npm run test:headed`
+
+<details>
+<summary>🔧 Neu einrichten (falls nötig)</summary>
+
+Falls die App Registration neu erstellt werden muss:
+
+1. **Azure App Registration erstellen**
+   - Gehe zu: https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/RegisteredApps
+   - Klicke "New registration"
+   - Name: `CHECK24 Test Automation`
+   - Supported account types: "Accounts in this organizational directory only"
+   - Klicke "Register"
+
+2. **API Permissions hinzufügen**
+   - Im linken Menü: "API permissions"
+   - "Add a permission" → "Microsoft Graph" → "Application permissions"
+   - Wähle: `Mail.Read`
+   - Klicke "Add permissions"
+   - **WICHTIG**: "Grant admin consent" (grünes Häkchen)
+
+3. **Client Secret erstellen**
+   - Im linken Menü: "Certificates & secrets"
+   - Tab: "Client secrets" → "New client secret"
+   - Description: `Test Automation Secret`
+   - Expires: 24 months
+   - **WICHTIG**: Kopiere den Value sofort!
+
+4. **Credentials in .env eintragen**
+   ```env
+   AZURE_TENANT_ID=deine-tenant-id
+   AZURE_CLIENT_ID=deine-client-id
+   AZURE_CLIENT_SECRET=dein-client-secret
+   EMAIL_ACCOUNT=loyaltytesting@check24.de
+   ```
+</details>
+
 ### Test-Artefakte
 
 Alle Test-Artefakte werden automatisch gespeichert:

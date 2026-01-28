@@ -1,17 +1,25 @@
 import { test, expect } from '@playwright/test';
-import { loginWithPassword, expectLoginSuccess, logout } from '../helpers/auth';
+import { loginWithPassword, expectLoginSuccess, logout, handleLoginChallenge } from '../helpers/auth';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 /**
  * Login Happy Path Test
- * Testet den erfolgreichen Login mit korrekten Zugangsdaten
+ * Testet den erfolgreichen Login mit korrekten Zugangsdaten (inkl. 2FA)
  */
 test.describe('CHECK24 Login - Happy Path', () => {
   test('Erfolgreicher Login mit korrekten Zugangsdaten', async ({ page }) => {
-    // Login durchführen
+    // Login durchführen (E-Mail + Passwort)
     const { email } = await loginWithPassword(page);
+    console.log(`✅ Login-Daten eingegeben für: ${email}`);
+
+    // Login-Challenge behandeln (falls vorhanden)
+    const hadChallenge = await handleLoginChallenge(page);
+    
+    if (hadChallenge) {
+      console.log('✅ Login-Challenge (2FA) erfolgreich bestanden');
+    }
 
     // Erfolgreichen Login verifizieren
     await expectLoginSuccess(page);
@@ -22,7 +30,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
       fullPage: true 
     });
 
-    console.log(`✅ Login erfolgreich für: ${email}`);
+    console.log(`✅ Login vollständig erfolgreich für: ${email}`);
 
     // Optional: Logout durchführen für saubere Cleanup
     await logout(page);
