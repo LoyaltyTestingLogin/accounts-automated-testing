@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import dotenv from 'dotenv';
+import { getEmailClient } from './email';
 
 dotenv.config();
 
@@ -168,8 +169,6 @@ export async function logout(page: Page) {
  * Behandelt die TAN-Eingabe nach dem initialen Login
  */
 export async function handleLoginChallenge(page: Page): Promise<boolean> {
-  const { getEmailClient } = await import('./email');
-  
   console.log('🔐 Prüfe auf Login-Challenge...');
   
   // Prüfe ob Login-Challenge erscheint (TAN-Eingabe)
