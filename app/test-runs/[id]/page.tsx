@@ -8,7 +8,7 @@ interface TestRun {
   id: number;
   testName: string;
   testSuite: string;
-  status: 'pending' | 'running' | 'passed' | 'failed';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout';
   startTime: string;
   endTime: string | null;
   duration: number | null;
@@ -82,6 +82,7 @@ export default function TestRunDetailsPage() {
   const { mainRun, batchRuns, summary } = details;
   const failedTests = batchRuns.filter(r => r.status === 'failed');
   const passedTests = batchRuns.filter(r => r.status === 'passed');
+  const timeoutTests = batchRuns.filter(r => r.status === 'timeout');
   
   // Falls nur der Main-Run existiert (keine einzelnen Tests), zeige diesen an
   const hasIndividualTests = batchRuns.length > 1 || (batchRuns.length === 1 && batchRuns[0].id !== mainRun.id);
@@ -108,7 +109,7 @@ export default function TestRunDetailsPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div className="card">
             <div className="text-sm text-gray-600 mb-1">Gesamt</div>
             <div className="text-3xl font-bold text-gray-900">{summary.total}</div>
@@ -120,6 +121,10 @@ export default function TestRunDetailsPage() {
           <div className="card">
             <div className="text-sm text-gray-600 mb-1">Fehlgeschlagen</div>
             <div className="text-3xl font-bold text-red-600">{summary.failed}</div>
+          </div>
+          <div className="card">
+            <div className="text-sm text-gray-600 mb-1">Timeout</div>
+            <div className="text-3xl font-bold text-yellow-600">{timeoutTests.length}</div>
           </div>
           <div className="card">
             <div className="text-sm text-gray-600 mb-1">Dauer</div>
@@ -147,6 +152,59 @@ export default function TestRunDetailsPage() {
                 💡 <strong>Hinweis:</strong> Der Playwright-Command konnte nicht erfolgreich ausgeführt werden. 
                 Möglicherweise wurde ein ungültiger Test-Pfad angegeben oder es gibt Syntax-Fehler im Test-Code.
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Timeout Tests */}
+        {hasIndividualTests && timeoutTests.length > 0 && (
+          <div className="card mb-6">
+            <h2 className="text-xl font-bold text-yellow-600 mb-4 flex items-center gap-2">
+              ⚠️ Tests mit Timeout ({timeoutTests.length})
+            </h2>
+            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+              <p className="text-sm text-yellow-800">
+                ℹ️ <strong>Hinweis:</strong> Diese Tests haben länger gedauert als erwartet und wurden abgebrochen.
+                Das bedeutet nicht zwingend, dass etwas falsch ist, könnte aber auf Performance-Probleme hinweisen.
+              </p>
+            </div>
+            <div className="space-y-4">
+              {timeoutTests.map((test) => (
+                <div key={test.id} className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{test.testName}</h3>
+                      <p className="text-sm text-gray-600">{test.testSuite}</p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                      Timeout
+                    </span>
+                  </div>
+                  
+                  {test.errorMessage && (
+                    <div className="mt-3">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Details:</div>
+                      <pre className="bg-gray-900 text-yellow-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                        {test.errorMessage}
+                      </pre>
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex gap-2 text-sm">
+                    {test.duration && (
+                      <span className="text-gray-600">
+                        ⏱ {(test.duration / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                    {test.screenshotPath && (
+                      <span className="text-blue-600">📷 Screenshot verfügbar</span>
+                    )}
+                    {test.videoPath && (
+                      <span className="text-blue-600">🎥 Video verfügbar</span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -227,6 +285,25 @@ export default function TestRunDetailsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Timeout message for non-individual tests */}
+        {!hasIndividualTests && mainRun.status === 'timeout' && mainRun.errorMessage && (
+          <div className="card mb-6">
+            <h2 className="text-xl font-bold text-yellow-600 mb-4 flex items-center gap-2">
+              ⚠️ Test-Ausführung mit Timeout
+            </h2>
+            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+              <p className="text-sm text-yellow-800">
+                ℹ️ <strong>Hinweis:</strong> Der Test hat länger gedauert als erwartet und wurde abgebrochen.
+                Das bedeutet nicht zwingend, dass etwas falsch ist, könnte aber auf Performance-Probleme hinweisen.
+              </p>
+            </div>
+            <div className="text-sm text-gray-700 mb-2 font-medium">Details:</div>
+            <pre className="bg-gray-900 text-yellow-400 p-4 rounded text-sm overflow-x-auto whitespace-pre-wrap">
+              {mainRun.errorMessage}
+            </pre>
           </div>
         )}
 

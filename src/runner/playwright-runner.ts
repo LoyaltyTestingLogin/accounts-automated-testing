@@ -89,14 +89,40 @@ export class PlaywrightRunner {
 
       // DB aktualisieren
       const allPassed = results.every(r => r.success);
+      const hasTimeout = results.some(r => {
+        const testRun = this.db.getTestRun(r.runId);
+        return testRun?.status === 'timeout';
+      });
+      
+      // Status ermitteln: Bei Timeout bevorzugen wir timeout, sonst failed
+      let mainStatus: 'passed' | 'failed' | 'timeout' = 'passed';
+      let mainErrorMessage = null;
+      
+      if (!allPassed) {
+        mainStatus = hasTimeout ? 'timeout' : 'failed';
+        const timeoutCount = results.filter(r => {
+          const testRun = this.db.getTestRun(r.runId);
+          return testRun?.status === 'timeout';
+        }).length;
+        const failedCount = results.filter(r => !r.success).length - timeoutCount;
+        
+        if (timeoutCount > 0 && failedCount > 0) {
+          mainErrorMessage = `${failedCount} Test(s) fehlgeschlagen, ${timeoutCount} Test(s) mit Timeout`;
+        } else if (timeoutCount > 0) {
+          mainErrorMessage = `${timeoutCount} Test(s) mit Timeout`;
+        } else {
+          mainErrorMessage = `${failedCount} Test(s) fehlgeschlagen`;
+        }
+      }
+      
       this.db.updateTestRun(runId, {
-        status: allPassed ? 'passed' : 'failed',
+        status: mainStatus,
         endTime: new Date().toISOString(),
         duration,
-        errorMessage: allPassed ? null : 'Einige Tests sind fehlgeschlagen',
+        errorMessage: mainErrorMessage,
       });
 
-      // Bei Fehler Slack-Benachrichtigung senden
+      // Bei Fehler oder Timeout Slack-Benachrichtigung senden
       if (!allPassed) {
         await this.notifyFailures(results);
       }
@@ -245,6 +271,7 @@ export class PlaywrightRunner {
           for (const test of tests) {
             const status = test.status; // passed, failed, timedOut, skipped
             const success = status === 'passed';
+            const isTimeout = status === 'timedOut';
             
             // Extrahiere aussagekräftige Fehlermeldung
             let error = null;
@@ -274,11 +301,23 @@ export class PlaywrightRunner {
               }
             }
 
+            // Status ermitteln: timeout, passed oder failed
+            let testStatus: 'passed' | 'failed' | 'timeout' = 'failed';
+            if (success) {
+              testStatus = 'passed';
+            } else if (isTimeout) {
+              testStatus = 'timeout';
+              // Füge Timeout-Hinweis zur Fehlermeldung hinzu
+              if (!error) {
+                error = `Test wurde nach ${test.duration ? (test.duration / 1000).toFixed(1) : 'N/A'} Sekunden abgebrochen (Timeout)`;
+              }
+            }
+
             // Einzelnen Test-Run in DB speichern
             const testRunId = this.db.createTestRun({
               testName: testTitle,
               testSuite: suite.title || testSuite,
-              status: success ? 'passed' : 'failed',
+              status: testStatus,
               startTime: new Date(Date.now() - duration).toISOString(),
               endTime: new Date().toISOString(),
               duration: test.duration,
@@ -380,7 +419,7 @@ export class PlaywrightRunner {
   }
 
   /**
-   * Sendet Slack-Benachrichtigungen für fehlgeschlagene Tests
+   * Sendet Slack-Benachrichtigungen für fehlgeschlagene Tests und Timeouts
    */
   private async notifyFailures(results: TestResult[]): Promise<void> {
     const failures = results.filter(r => !r.success);
@@ -389,7 +428,14 @@ export class PlaywrightRunner {
       const testRun = this.db.getTestRun(failure.runId);
       
       if (testRun && !testRun.slackNotified) {
-        const notified = await this.slackNotifier.notifyTestFailure({ testRun });
+        let notified = false;
+        
+        // Unterscheide zwischen Timeout und regulärem Fehler
+        if (testRun.status === 'timeout') {
+          notified = await this.slackNotifier.notifyTestTimeout({ testRun });
+        } else {
+          notified = await this.slackNotifier.notifyTestFailure({ testRun });
+        }
         
         if (notified) {
           this.db.updateTestRun(failure.runId, { slackNotified: true });

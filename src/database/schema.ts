@@ -10,7 +10,7 @@ export interface TestRun {
   id: number;
   testName: string;
   testSuite: string;
-  status: 'pending' | 'running' | 'passed' | 'failed';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout';
   startTime: string;
   endTime: string | null;
   duration: number | null;
@@ -28,7 +28,7 @@ export interface TestRun {
 export interface TestRunInsert {
   testName: string;
   testSuite: string;
-  status: 'pending' | 'running' | 'passed' | 'failed';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout';
   startTime: string;
   endTime?: string | null;
   duration?: number | null;

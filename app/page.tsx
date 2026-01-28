@@ -111,6 +111,8 @@ export default function Dashboard() {
         return <span className="badge-success">✓ Erfolgreich</span>;
       case 'failed':
         return <span className="badge-error">✗ Fehlgeschlagen</span>;
+      case 'timeout':
+        return <span className="badge-warning">⚠ Timeout</span>;
       case 'running':
         return <span className="badge-info">⟳ Läuft</span>;
       case 'pending':
@@ -249,7 +251,7 @@ export default function Dashboard() {
                         if (filteredSuites.length === 0) {
                           return (
                             <div className="p-4 text-center text-gray-500 text-sm">
-                              Keine Tests gefunden für "{searchQuery}"
+                              Keine Tests gefunden für &ldquo;{searchQuery}&rdquo;
                             </div>
                           );
                         }

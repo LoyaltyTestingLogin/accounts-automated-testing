@@ -48,6 +48,32 @@ export class SlackNotifier {
   }
 
   /**
+   * Sendet eine Benachrichtigung über einen Timeout
+   */
+  async notifyTestTimeout(options: SlackNotificationOptions): Promise<boolean> {
+    if (!this.webhookUrl) {
+      console.log('Slack-Benachrichtigung übersprungen (keine Webhook-URL)');
+      return false;
+    }
+
+    const { testRun, dashboardUrl } = options;
+    
+    try {
+      const message = this.buildTimeoutMessage(testRun, dashboardUrl);
+      
+      await axios.post(this.webhookUrl, message, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      console.log(`⚠️  Slack-Timeout-Benachrichtigung gesendet für Test: ${testRun.testName}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Fehler beim Senden der Slack-Benachrichtigung:', error);
+      return false;
+    }
+  }
+
+  /**
    * Sendet eine Benachrichtigung über einen erfolgreichen Test
    * (Optional, normalerweise nur bei Wiederherstellung nach Fehler)
    */
@@ -136,6 +162,116 @@ export class SlackNotifier {
             text: {
               type: 'mrkdwn',
               text: `*Fehlermeldung:*\n\`\`\`${this.truncateText(testRun.errorMessage, 2000)}\`\`\``,
+            },
+          },
+        ] : []),
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Verfügbare Artefakte:*\n${this.getArtifactsText(testRun)}`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '📊 Details anzeigen',
+                emoji: true,
+              },
+              url: detailUrl,
+              style: 'primary',
+            },
+          ],
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `Test-ID: #${testRun.id} | CHECK24 Login Testing System`,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  /**
+   * Erstellt Slack-Message für Test-Timeout
+   */
+  private buildTimeoutMessage(testRun: TestRun, dashboardUrl?: string) {
+    const baseUrl = dashboardUrl || process.env.DASHBOARD_BASE_URL || 'http://localhost:3000';
+    const detailUrl = `${baseUrl}/test-runs/${testRun.id}`;
+    
+    const duration = testRun.duration ? `${(testRun.duration / 1000).toFixed(2)}s` : 'N/A';
+    
+    return {
+      text: `⚠️ CHECK24 Login E2E Test TIMEOUT`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: '*Warnung:* Ein automatischer Login-Test hat ungewöhnlich lange gedauert.',
+          },
+        },
+        {
+          type: 'divider',
+        },
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: '⚠️ Test dauert zu lange',
+            emoji: true,
+          },
+        },
+        {
+          type: 'section',
+          fields: [
+            {
+              type: 'mrkdwn',
+              text: `*Test:*\n${testRun.testName}`,
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Suite:*\n${testRun.testSuite}`,
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Status:*\n⏱️ Timeout`,
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Dauer:*\n${duration}`,
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Zeitpunkt:*\n${new Date(testRun.startTime).toLocaleString('de-DE')}`,
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Trigger:*\n${testRun.triggeredBy === 'scheduled' ? '⏰ Automatisch' : '👤 Manuell'}`,
+            },
+          ],
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: '*ℹ️ Hinweis:*\nDer Test ist möglicherweise nicht fehlgeschlagen, aber die Ausführung hat länger gedauert als erwartet. Dies könnte auf Performance-Probleme oder langsame Netzwerkverbindungen hinweisen.',
+          },
+        },
+        ...(testRun.errorMessage ? [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*Details:*\n\`\`\`${this.truncateText(testRun.errorMessage, 2000)}\`\`\``,
             },
           },
         ] : []),
