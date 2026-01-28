@@ -137,27 +137,47 @@ export class EmailClient {
    * - 6-stellige Zahlen
    */
   extractTanCode(email: EmailMessage): string | null {
-    const text = email.body;
+    // Zuerst im Betreff suchen (oft steht der Code dort)
+    const subject = email.subject;
+    const body = email.body;
+    
+    console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
+    console.log('   Betreff:', subject);
+    console.log('   Body (erste 200 Zeichen):', body.substring(0, 200));
 
-    // Verschiedene Muster für TAN-Codes
+    // Verschiedene Muster für TAN-Codes (ohne 'g' Flag, um State-Probleme zu vermeiden)
     const patterns = [
-      /(?:code|tan|otp|verification code|bestätigungscode|sicherheitscode)[:\s]+([0-9]{4,8})/gi,
-      /([0-9]{6})\s+(?:ist|is)\s+(?:ihr|your|dein)\s+(?:code|tan)/gi,
-      /\b([0-9]{6})\b/g, // 6-stellige Zahl (fallback)
+      // "123456 ist Ihr CHECK24 Sicherheitscode"
+      /([0-9]{6})\s+(?:ist|is)\s+(?:ihr|your|dein)\s+(?:code|tan|sicherheitscode|bestätigungscode)/i,
+      // "Ihr Code: 123456" oder "Code: 123456"
+      /(?:code|tan|otp|verification code|bestätigungscode|sicherheitscode)[:\s]+([0-9]{4,8})/i,
+      // Fallback: Erste 6-stellige Zahl (nur wenn nichts anderes gefunden)
+      /\b([0-9]{6})\b/,
     ];
 
+    // Zuerst im Betreff suchen
     for (const pattern of patterns) {
-      const match = pattern.exec(text);
+      const match = subject.match(pattern);
       if (match && match[1]) {
         const code = match[1];
-        console.log(`✅ TAN-Code extrahiert: ${code}`);
+        console.log(`✅ TAN-Code extrahiert aus Betreff: ${code}`);
+        return code;
+      }
+    }
+
+    // Dann im Body suchen
+    for (const pattern of patterns) {
+      const match = body.match(pattern);
+      if (match && match[1]) {
+        const code = match[1];
+        console.log(`✅ TAN-Code extrahiert aus Body: ${code}`);
         return code;
       }
     }
 
     console.warn('⚠️  Kein TAN-Code in E-Mail gefunden');
-    console.log('E-Mail Betreff:', email.subject);
-    console.log('E-Mail Body (Vorschau):', text.substring(0, 500));
+    console.log('E-Mail Betreff:', subject);
+    console.log('E-Mail Body (Vorschau):', body.substring(0, 500));
     return null;
   }
 
