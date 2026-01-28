@@ -2,8 +2,6 @@
 
 Automatisiertes End-to-End-Frontend-Testing des CHECK24-Logins mit Playwright, Web-Dashboard und 24/7-Monitoring.
 
-<!-- Test-Änderung für Branch-Demo -->
-
 ## 🎯 Features
 
 - ✅ **E2E-Tests mit Playwright** - Automatisierte Browser-Tests für CHECK24 Login
