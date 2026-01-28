@@ -64,7 +64,7 @@ export class TestDatabase {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         testName TEXT NOT NULL,
         testSuite TEXT NOT NULL,
-        status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'passed', 'failed')),
+        status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'passed', 'failed', 'timeout')),
         startTime TEXT NOT NULL,
         endTime TEXT,
         duration INTEGER,
@@ -237,6 +237,14 @@ export class TestDatabase {
       ...row,
       slackNotified: Boolean(row.slackNotified),
     };
+  }
+
+  /**
+   * Test-Run löschen
+   */
+  deleteTestRun(id: number): void {
+    const stmt = this.db.prepare('DELETE FROM test_runs WHERE id = ?');
+    stmt.run(id);
   }
 
   /**
