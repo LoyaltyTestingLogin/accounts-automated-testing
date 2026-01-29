@@ -209,6 +209,104 @@ app.get('/api/test-suites', (req, res) => {
 });
 
 /**
+ * GET /api/scheduler/status
+ * Gibt den aktuellen Status des Schedulers zurück
+ */
+app.get('/api/scheduler/status', (req, res) => {
+  try {
+    const isPaused = db.isSchedulerPaused();
+    
+    res.json({
+      success: true,
+      data: {
+        available: true,
+        isPaused: isPaused,
+        isRunning: false, // Kann nur der Worker wissen
+        cronExpression: process.env.TEST_INTERVAL_MINUTES || '15',
+      },
+    });
+  } catch (error: any) {
+    console.error('Fehler beim Abrufen des Scheduler-Status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/scheduler/pause
+ * Pausiert den automatischen Test-Scheduler
+ */
+app.post('/api/scheduler/pause', (req, res) => {
+  try {
+    const currentlyPaused = db.isSchedulerPaused();
+    
+    if (currentlyPaused) {
+      return res.json({
+        success: true,
+        message: 'Scheduler war bereits pausiert',
+        data: {
+          isPaused: true,
+        },
+      });
+    }
+
+    db.setSchedulerPaused(true);
+    
+    res.json({
+      success: true,
+      message: 'Scheduler pausiert',
+      data: {
+        isPaused: true,
+      },
+    });
+  } catch (error: any) {
+    console.error('Fehler beim Pausieren des Schedulers:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/scheduler/resume
+ * Setzt den automatischen Test-Scheduler fort
+ */
+app.post('/api/scheduler/resume', (req, res) => {
+  try {
+    const currentlyPaused = db.isSchedulerPaused();
+    
+    if (!currentlyPaused) {
+      return res.json({
+        success: true,
+        message: 'Scheduler lief bereits',
+        data: {
+          isPaused: false,
+        },
+      });
+    }
+
+    db.setSchedulerPaused(false);
+    
+    res.json({
+      success: true,
+      message: 'Scheduler fortgesetzt',
+      data: {
+        isPaused: false,
+      },
+    });
+  } catch (error: any) {
+    console.error('Fehler beim Fortsetzen des Schedulers:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * Error Handler
  */
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -231,8 +329,11 @@ function startServer() {
     console.log(`   GET  /api/test-runs/:id`);
     console.log(`   GET  /api/statistics`);
     console.log(`   GET  /api/test-suites`);
+    console.log(`   GET  /api/scheduler/status`);
     console.log(`   POST /api/run-tests`);
-    console.log(`   POST /api/test-slack\n`);
+    console.log(`   POST /api/test-slack`);
+    console.log(`   POST /api/scheduler/pause`);
+    console.log(`   POST /api/scheduler/resume\n`);
   });
 }
 

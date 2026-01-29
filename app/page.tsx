@@ -48,6 +48,9 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showTestInfo, setShowTestInfo] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [schedulerPaused, setSchedulerPaused] = useState(false);
+  const [schedulerAvailable, setSchedulerAvailable] = useState(true);
+  const [togglingScheduler, setTogglingScheduler] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -59,19 +62,48 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [runsRes, statsRes, suitesRes] = await Promise.all([
+      const [runsRes, statsRes, suitesRes, schedulerRes] = await Promise.all([
         axios.get('/api/test-runs?limit=20'),
         axios.get('/api/statistics'),
         axios.get('/api/test-suites'),
+        axios.get('/api/scheduler/status').catch(() => ({ data: { data: { available: false, isPaused: false } } })),
       ]);
 
       setTestRuns(runsRes.data.data || []);
       setStatistics(statsRes.data.data || null);
       setTestSuites(suitesRes.data.data || []);
+      
+      // Scheduler Status
+      if (schedulerRes.data?.data) {
+        setSchedulerAvailable(schedulerRes.data.data.available);
+        setSchedulerPaused(schedulerRes.data.data.isPaused || false);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Fehler beim Laden der Daten:', error);
       setLoading(false);
+    }
+  };
+
+  const toggleScheduler = async () => {
+    if (togglingScheduler || !schedulerAvailable) return;
+
+    setTogglingScheduler(true);
+    
+    try {
+      const endpoint = schedulerPaused ? '/api/scheduler/resume' : '/api/scheduler/pause';
+      const response = await axios.post(endpoint);
+      
+      if (response.data.success) {
+        setSchedulerPaused(!schedulerPaused);
+        alert(schedulerPaused ? '▶️ Automatische Tests laufen wieder' : '⏸️ Automatische Tests pausiert');
+      }
+    } catch (error) {
+      console.error('Fehler beim Pausieren/Fortsetzen:', error);
+      alert('Fehler beim Ändern des Scheduler-Status');
+    } finally {
+      setTogglingScheduler(false);
     }
   };
 
@@ -145,13 +177,71 @@ export default function Dashboard() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
-      <header className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">
-          CHECK24 Login Testing
-        </h1>
-        <p className="text-gray-600">
-          Automatisiertes E2E Testing mit 24/7 Monitoring
-        </p>
+      <header className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            CHECK24 Login Testing
+          </h1>
+          <p className="text-gray-600">
+            Automatisiertes E2E Testing mit 24/7 Monitoring
+          </p>
+        </div>
+        
+        {/* Scheduler Pause/Resume Button */}
+        {schedulerAvailable && (
+          <div className="relative group">
+            <button
+              onClick={toggleScheduler}
+              disabled={togglingScheduler}
+              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 flex items-center gap-2 ${
+                schedulerPaused 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-red-600 hover:bg-red-700'
+              } ${togglingScheduler ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
+            >
+              {togglingScheduler ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Wird geändert...</span>
+                </>
+              ) : schedulerPaused ? (
+                <>
+                  <span>▶️</span>
+                  <span>Tests fortsetzen</span>
+                </>
+              ) : (
+                <>
+                  <span>⏸️</span>
+                  <span>Tests pausieren</span>
+                </>
+              )}
+            </button>
+            
+            {/* Custom Tooltip */}
+            <div className="absolute right-0 top-full mt-2 w-80 bg-gray-900 text-white text-sm rounded-lg p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+              <div className="font-bold mb-2">
+                {schedulerPaused ? '▶️ Tests fortsetzen' : '⏸️ Automatische Tests pausieren'}
+              </div>
+              <div className="text-gray-300 space-y-1">
+                {schedulerPaused ? (
+                  <>
+                    <p>• Automatische Tests laufen wieder alle <strong>15 Minuten</strong></p>
+                    <p>• 24/7 Monitoring wird fortgesetzt</p>
+                    <p>• Manuelle Tests waren weiterhin möglich</p>
+                  </>
+                ) : (
+                  <>
+                    <p>• Stoppt die automatischen Test-Durchläufe</p>
+                    <p>• Läuft normalerweise alle <strong>15 Minuten</strong></p>
+                    <p>• Manuelle Tests bleiben weiterhin möglich</p>
+                  </>
+                )}
+              </div>
+              {/* Arrow */}
+              <div className="absolute -top-2 right-8 w-4 h-4 bg-gray-900 transform rotate-45"></div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Statistiken */}

@@ -15,9 +15,56 @@ export class TestScheduler {
   private db = getDatabase();
   private isRunning = false;
   private cronJob: cron.ScheduledTask | null = null;
+  private isPaused = false;
 
   constructor() {
     console.log('🤖 Test-Scheduler initialisiert');
+  }
+
+  /**
+   * Pausiert den Scheduler (Tests laufen nicht mehr automatisch)
+   */
+  pause() {
+    const currentlyPaused = this.db.isSchedulerPaused();
+    if (currentlyPaused) {
+      console.log('⏸️  Scheduler ist bereits pausiert');
+      return false;
+    }
+    
+    this.db.setSchedulerPaused(true);
+    this.isPaused = true;
+    console.log('⏸️  Scheduler pausiert - automatische Tests gestoppt');
+    return true;
+  }
+
+  /**
+   * Setzt den Scheduler fort (Tests laufen wieder automatisch)
+   */
+  resume() {
+    const currentlyPaused = this.db.isSchedulerPaused();
+    if (!currentlyPaused) {
+      console.log('▶️  Scheduler läuft bereits');
+      return false;
+    }
+    
+    this.db.setSchedulerPaused(false);
+    this.isPaused = false;
+    console.log('▶️  Scheduler fortgesetzt - automatische Tests laufen wieder');
+    return true;
+  }
+
+  /**
+   * Gibt den aktuellen Status zurück
+   */
+  getStatus() {
+    const isPaused = this.db.isSchedulerPaused();
+    this.isPaused = isPaused; // Sync Memory-State mit DB
+    
+    return {
+      isPaused: isPaused,
+      isRunning: this.isRunning,
+      cronExpression: this.cronJob ? process.env.TEST_INTERVAL_MINUTES || '15' : null,
+    };
   }
 
   /**
@@ -61,6 +108,13 @@ export class TestScheduler {
    * Führt geplante Tests aus
    */
   private async executeScheduledTests() {
+    // Prüfe Pause-Status aus Datenbank (für Prozess-übergreifende Kommunikation)
+    const isPaused = this.db.isSchedulerPaused();
+    if (isPaused) {
+      console.log('⏸️  Scheduler ist pausiert, überspringe Test-Durchlauf');
+      return;
+    }
+
     if (this.isRunning) {
       console.log('⏭️  Test läuft bereits, überspringe diesen Durchlauf');
       return;
@@ -151,12 +205,20 @@ export class TestScheduler {
   }
 }
 
+// Globale Scheduler-Instanz für externe Zugriffe (z.B. API)
+let globalScheduler: TestScheduler | null = null;
+
+export function getScheduler(): TestScheduler | null {
+  return globalScheduler;
+}
+
 // Hauptfunktion
 async function main() {
   console.log('🚀 CHECK24 Login Testing - 24/7 Worker');
   console.log('=========================================\n');
 
   const scheduler = new TestScheduler();
+  globalScheduler = scheduler;
   scheduler.start();
 
   // Cleanup jeden Tag um 3 Uhr (löscht alte Test-Runs)

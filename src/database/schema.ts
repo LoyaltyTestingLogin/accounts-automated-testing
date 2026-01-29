@@ -83,6 +83,13 @@ export class TestDatabase {
       CREATE INDEX IF NOT EXISTS idx_test_runs_status ON test_runs(status);
       CREATE INDEX IF NOT EXISTS idx_test_runs_startTime ON test_runs(startTime DESC);
       CREATE INDEX IF NOT EXISTS idx_test_runs_testSuite ON test_runs(testSuite);
+      
+      -- Scheduler-Status Tabelle (für Pause/Resume über Prozesse hinweg)
+      CREATE TABLE IF NOT EXISTS scheduler_status (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     
     // Migration: Füge neue Spalten zu bestehenden Tabellen hinzu
@@ -245,6 +252,29 @@ export class TestDatabase {
   deleteTestRun(id: number): void {
     const stmt = this.db.prepare('DELETE FROM test_runs WHERE id = ?');
     stmt.run(id);
+  }
+
+  /**
+   * Scheduler-Status setzen (für Pause/Resume)
+   */
+  setSchedulerPaused(isPaused: boolean): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO scheduler_status (key, value, updatedAt)
+      VALUES ('isPaused', ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updatedAt = CURRENT_TIMESTAMP
+    `);
+    stmt.run(isPaused ? '1' : '0');
+  }
+
+  /**
+   * Scheduler-Status abfragen
+   */
+  isSchedulerPaused(): boolean {
+    const stmt = this.db.prepare('SELECT value FROM scheduler_status WHERE key = ?');
+    const result = stmt.get('isPaused') as { value: string } | undefined;
+    return result?.value === '1';
   }
 
   /**
