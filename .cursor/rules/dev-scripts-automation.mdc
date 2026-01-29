@@ -1,0 +1,54 @@
+---
+description: Automatically execute start-dev.sh and stop-dev.sh when user wants to start/stop the application
+alwaysApply: true
+---
+
+# Development Scripts Automation
+
+When the user mentions starting or stopping the application, automatically execute the appropriate script.
+
+## Start Commands
+
+When user says any of these:
+- "starte die Anwendung"
+- "starte das System"
+- "starte die Services"
+- "start the application"
+- "start services"
+- "run the app"
+- Similar variations
+
+**Action:** Execute `./start-dev.sh` from the project root directory
+
+```bash
+cd /Users/louisrossmann/Repo/accounts_automatedtesting
+./start-dev.sh
+```
+
+## Stop Commands
+
+When user says any of these:
+- "stoppe die Anwendung"
+- "stoppe das System"
+- "stoppe die Services"
+- "stop the application"
+- "stop services"
+- "kill the app"
+- Similar variations
+
+**Action:** Execute `./stop-dev.sh` from the project root directory
+
+```bash
+cd /Users/louisrossmann/Repo/accounts_automatedtesting
+./stop-dev.sh
+```
+
+## Important Notes
+
+- Always use the shell scripts, not npm commands directly
+- The scripts handle:
+  - Frontend (Port 3000)
+  - API (Port 4000)
+  - Worker process
+- No need to ask for confirmation - just execute
+- Works from any location (scripts handle cd internally)
