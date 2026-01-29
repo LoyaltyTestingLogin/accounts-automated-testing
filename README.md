@@ -98,7 +98,24 @@ check24-login-testing/
 
 5. **System starten**
    
-   Alle Services gleichzeitig (empfohlen):
+   **Option A: Mit Shell-Skript (einfachste Methode):**
+   ```bash
+   ./start-dev.sh
+   ```
+   
+   Das Skript:
+   - ✅ Prüft ob Node.js installiert ist
+   - ✅ Installiert Dependencies automatisch falls nötig
+   - ✅ Startet alle Services (Frontend, API, Worker)
+   
+   **System stoppen:**
+   ```bash
+   ./stop-dev.sh
+   ```
+   
+   **Option B: Mit npm-Befehlen:**
+   
+   Alle Services gleichzeitig:
    ```bash
    npm run dev
    ```
@@ -119,6 +136,35 @@ check24-login-testing/
    ```
    http://localhost:3000
    ```
+
+## 📜 Development Scripts
+
+Das Projekt enthält praktische Shell-Skripte für einfaches Starten/Stoppen:
+
+### `./start-dev.sh`
+Startet das komplette System mit einer einzigen Befehl:
+- Prüft automatisch ob Node.js installiert ist
+- Installiert Dependencies falls `node_modules/` fehlt
+- Lädt nvm/fnm falls vorhanden
+- Startet alle Services: Frontend (Port 3000), API (Port 4000) und Worker
+
+**Verwendung:**
+```bash
+./start-dev.sh
+```
+
+### `./stop-dev.sh`
+Beendet alle laufenden Entwicklungs-Services:
+- Findet und beendet Prozesse auf Port 3000 (Frontend)
+- Findet und beendet Prozesse auf Port 4000 (API)
+- Worker wird automatisch mit gestoppt
+
+**Verwendung:**
+```bash
+./stop-dev.sh
+```
+
+**Tipp:** Diese Skripte sind besonders nützlich auf einem zweiten Laptop oder für schnelle Deployments!
 
 ### Installation (Docker)
 
