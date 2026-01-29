@@ -44,7 +44,7 @@ export default function Dashboard() {
   const [testSuites, setTestSuites] = useState<TestSuite[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningTest, setRunningTest] = useState(false);
-  const [selectedSuite, setSelectedSuite] = useState<string>('login-happy');
+  const [selectedSuite, setSelectedSuite] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showTestInfo, setShowTestInfo] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -272,51 +272,50 @@ export default function Dashboard() {
       )}
 
       {/* Test-Steuerung */}
-      <div className="card mb-8">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Tests manuell ausführen
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          🧪 Tests manuell ausführen
         </h2>
 
-        {/* Einzelner Test (links) + Alle Tests (rechts) */}
-        <div className="flex gap-4 items-start">
-          {/* Einzelner Test - Dropdown */}
-          <div className="flex-1 max-w-2xl">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* LINKE KARTE: Einzelner Test mit Browser-Ansicht */}
+          <div className="card border-2 border-blue-200 bg-blue-50/30">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-2xl">🎬</span>
+                  Einzelner Test (mit Browser)
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Führt einen ausgewählten Test im Browser aus → <strong>Du kannst zusehen</strong>
+                </p>
+              </div>
+            </div>
+
+            {/* Spacer oben */}
+            <div className="py-3"></div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Einzelner Test
-              </label>
             <div className="relative">
-              {/* Dropdown Button */}
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                disabled={runningTest}
-                className="w-full px-4 py-3 text-left border border-gray-300 rounded-lg hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-white flex items-center justify-between"
-              >
-                <span className="font-medium text-gray-900">
-                  {testSuites.find(s => s.id === selectedSuite)?.name || 'Test auswählen...'}
+              {/* Kombiniertes Such-/Dropdown-Feld */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Test suchen oder auswählen..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsDropdownOpen(true)}
+                  disabled={runningTest}
+                  className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-white"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  {isDropdownOpen ? '▲' : '▼'}
                 </span>
-                <span className="text-gray-400">{isDropdownOpen ? '▲' : '▼'}</span>
-              </button>
+              </div>
 
               {/* Dropdown Menu */}
               {isDropdownOpen && (
                 <div className="absolute z-10 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-hidden">
-                  {/* Suchfeld im Dropdown */}
-                  <div className="p-3 border-b border-gray-200 bg-gray-50">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Test durchsuchen..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <span className="absolute right-3 top-2 text-gray-400 text-sm">🔍</span>
-                    </div>
-                  </div>
-
                   {/* Test-Liste */}
                   <div className="max-h-80 overflow-y-auto">
                     {testSuites.length === 0 ? (
@@ -357,10 +356,10 @@ export default function Dashboard() {
                               <button
                                 key={suite.id}
                                 onClick={() => {
-                                  setSelectedSuite(suite.id);
                                   runTests(suite.path);
                                   setIsDropdownOpen(false);
                                   setSearchQuery('');
+                                  setSelectedSuite(''); // Dropdown zurücksetzen
                                 }}
                                 disabled={runningTest}
                                 className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0 disabled:opacity-50 disabled:cursor-not-allowed group"
@@ -412,30 +411,46 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Alle Tests starten - rechts */}
-          <div className="flex-shrink-0">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Alle Tests
-            </label>
-            <button
-              onClick={() => runTests('tests')}
-              disabled={runningTest}
-              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap h-[46px] px-6"
-            >
-              {runningTest ? (
-                <>
-                  <span className="animate-spin">⟳</span>
-                  Läuft...
-                </>
-              ) : (
-                <>
-                  🧪 Alle starten
-                </>
-              )}
-            </button>
-            <p className="text-xs text-gray-500 mt-2">
-              {testSuites.length} Tests verfügbar
-            </p>
+          {/* RECHTE KARTE: Alle Tests im Hintergrund */}
+          <div className="card border-2 border-purple-200 bg-purple-50/30">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-2xl">⚡</span>
+                  Alle Tests (Headless)
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Führt alle Tests im Hintergrund aus → <strong>Läuft ohne Browser-Fenster</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Statistik */}
+              <div className="text-center py-6">
+                <div className="text-3xl font-bold text-purple-600">{testSuites.length}</div>
+                <div className="text-sm text-gray-600">Tests verfügbar</div>
+              </div>
+
+              {/* Button */}
+              <button
+                onClick={() => runTests('tests')}
+                disabled={runningTest}
+                className="w-full btn-primary bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {runningTest ? (
+                  <>
+                    <span className="animate-spin">⟳</span>
+                    <span>Tests laufen...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚀</span>
+                    <span>Alle Tests starten</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
