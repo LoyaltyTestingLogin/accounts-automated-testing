@@ -109,6 +109,21 @@ export async function expectLoginSuccess(page: Page) {
   // Prüfen auf URL-Änderung (zum Kundenbereich)
   await expect(page).toHaveURL(/kundenbereich\.check24\.de/);
 
+  // WICHTIG: Prüfe c24session Cookie (zuverlässigster Indikator für erfolgreichen Login)
+  console.log('🔍 Prüfe c24session Cookie...');
+  const cookies = await page.context().cookies();
+  const c24sessionCookie = cookies.find(cookie => cookie.name === 'c24session');
+  
+  if (c24sessionCookie) {
+    console.log(`✅ c24session Cookie gefunden: ${c24sessionCookie.value.substring(0, 20)}...`);
+    console.log(`   Domain: ${c24sessionCookie.domain}`);
+    console.log(`   Expires: ${c24sessionCookie.expires ? new Date(c24sessionCookie.expires * 1000).toISOString() : 'Session'}`);
+  } else {
+    console.warn('⚠️  c24session Cookie nicht gefunden - Login möglicherweise nicht vollständig');
+    // Liste alle vorhandenen Cookies zur Diagnose
+    console.log('📋 Vorhandene Cookies:', cookies.map(c => c.name).join(', '));
+  }
+
   // Prüfen auf typische Post-Login-Elemente
   const loggedInIndicators = [
     page.locator('[data-testid="user-menu"]'),
@@ -129,18 +144,34 @@ export async function expectLoginSuccess(page: Page) {
     }
   }
 
-  console.log('✅ Login erfolgreich verifiziert - Kundenbereich geladen');
+  // Finale Validierung: Cookie MUSS vorhanden sein für erfolgreichen Login
+  if (!c24sessionCookie) {
+    throw new Error('Login nicht vollständig: c24session Cookie fehlt');
+  }
+
+  console.log('✅ Login erfolgreich verifiziert - Kundenbereich geladen und c24session Cookie gesetzt');
 }
 
 /**
  * Logout-Helper
  */
 export async function logout(page: Page) {
+  console.log('🚪 Versuche Logout...');
+  
   const logoutButton = page.locator('button:has-text("Abmelden"), a:has-text("Abmelden"), [data-testid="logout"]').first();
   
   if (await logoutButton.count() > 0) {
-    await logoutButton.click();
-    await page.waitForLoadState('networkidle');
+    try {
+      // Versuche mit force: true wenn nicht sichtbar
+      await logoutButton.click({ force: true, timeout: 5000 });
+      console.log('✅ Logout-Button geklickt');
+      await page.waitForLoadState('networkidle');
+    } catch (e) {
+      console.log('ℹ️  Logout-Button nicht klickbar - überspringe Logout (Session läuft aus)');
+      // Nicht kritisch - Session läuft eh aus
+    }
+  } else {
+    console.log('ℹ️  Kein Logout-Button gefunden - überspringe Logout');
   }
 }
 
@@ -457,5 +488,131 @@ export async function handleLoginChallenge(page: Page): Promise<boolean> {
   }
 
   console.log('✅ Login-Challenge abgeschlossen');
+  
+  // SCHRITT 7: Telefonnummer-Hinterlegungs-Screen überspringen (falls vorhanden)
+  await page.waitForTimeout(3000);
+  
+  console.log('🔍 Analysiere Seite nach Login-Challenge...');
+  const postChallengeUrl = page.url();
+  const postChallengeTitle = await page.title();
+  console.log(`📍 Aktuelle URL: ${postChallengeUrl}`);
+  console.log(`📄 Seitentitel: ${postChallengeTitle}`);
+  
+  // Debug: Zeige Seiteninhalt
+  const bodyText = await page.locator('body').textContent();
+  console.log(`📄 Seiteninhalt (erste 300 Zeichen): ${bodyText?.substring(0, 300)}...`);
+  
+  // Debug: Liste alle Buttons auf
+  const allButtons = await page.locator('button, a[role="button"]').all();
+  console.log(`🔘 Gefundene Buttons (${allButtons.length}):`);
+  for (let i = 0; i < Math.min(allButtons.length, 10); i++) {
+    const btnText = await allButtons[i].textContent();
+    const btnType = await allButtons[i].getAttribute('type');
+    console.log(`   ${i + 1}. "${btnText?.trim()}" (type: ${btnType})`);
+  }
+  
+  // Prüfe auf Telefonnummer-Screen (case-insensitive)
+  const phoneScreenPatterns = [
+    /telefonnummer/i,
+    /handynummer/i,
+    /mobilnummer/i,
+    /später.*erinnern/i,
+    /jetzt.*nicht/i,
+    /überspringen/i,
+  ];
+  
+  let phoneScreenFound = false;
+  for (const pattern of phoneScreenPatterns) {
+    if (bodyText && pattern.test(bodyText)) {
+      console.log(`✅ Telefonnummer-Screen erkannt: Pattern matched "${pattern}"`);
+      phoneScreenFound = true;
+      break;
+    }
+  }
+  
+  if (phoneScreenFound) {
+    console.log('➡️  Suche "später erinnern" oder ähnlichen Button...');
+    
+    // Screenshot vor dem Klick
+    await page.screenshot({ 
+      path: `test-results/screenshots/phone-screen-${Date.now()}.png`,
+      fullPage: true 
+    });
+    
+    // Erweiterte Button-Selektoren (case-insensitive)
+    const laterButtonSelectors = [
+      'button:has-text("später")',
+      'a:has-text("später")',
+      'button:has-text("Später")',
+      'a:has-text("Später")',
+      'button:has-text("erinnern")',
+      'button:has-text("Jetzt nicht")',
+      'button:has-text("jetzt nicht")',
+      'button:has-text("Nein")',
+      'button:has-text("Skip")',
+      'button:has-text("Überspringen")',
+      '[data-testid*="skip"]',
+      '[data-testid*="later"]',
+      '[data-test*="skip"]',
+      '[class*="skip"]',
+      '[class*="later"]',
+    ];
+    
+    let laterClicked = false;
+    for (const selector of laterButtonSelectors) {
+      try {
+        const button = page.locator(selector).first();
+        const count = await button.count();
+        
+        if (count > 0) {
+          console.log(`🔍 Button gefunden mit Selektor: ${selector}`);
+          const btnText = await button.textContent();
+          console.log(`   Button-Text: "${btnText?.trim()}"`);
+          
+          // Versuche mit force: true zu klicken
+          try {
+            await button.click({ force: true, timeout: 5000 });
+            console.log(`✅ Button geklickt (${selector})`);
+            laterClicked = true;
+            await page.waitForTimeout(2000);
+            break;
+          } catch (clickErr) {
+            // Fallback: JavaScript-Klick
+            console.log('⚠️  Normaler Klick fehlgeschlagen, versuche JavaScript...');
+            await button.evaluate((btn: any) => btn.click());
+            console.log(`✅ Button geklickt via JavaScript (${selector})`);
+            laterClicked = true;
+            await page.waitForTimeout(2000);
+            break;
+          }
+        }
+      } catch (e) {
+        // Nächsten Selektor versuchen
+        continue;
+      }
+    }
+    
+    if (!laterClicked) {
+      console.log('⚠️  WARNUNG: "später erinnern" Button konnte nicht geklickt werden');
+      console.log('   Seiten-URL:', postChallengeUrl);
+      console.log('   Verfügbare Buttons wurden oben gelistet');
+      
+      // Screenshot nach Fehler
+      await page.screenshot({ 
+        path: `test-results/screenshots/phone-screen-error-${Date.now()}.png`,
+        fullPage: true 
+      });
+    } else {
+      console.log('✅ Telefonnummer-Screen übersprungen');
+      
+      // Warte auf Navigation
+      await page.waitForTimeout(2000);
+      const newUrl = page.url();
+      console.log(`📍 Neue URL nach Skip: ${newUrl}`);
+    }
+  } else {
+    console.log('ℹ️  Kein Telefonnummer-Screen erkannt - überspringe');
+  }
+  
   return true;
 }
