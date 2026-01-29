@@ -1,24 +1,29 @@
 import { test, expect } from '@playwright/test';
 import { loginWithPassword, expectLoginSuccess, logout, handleLoginChallenge } from '../helpers/auth';
+import { getAccountCredentials } from '../fixtures/accounts';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 /**
  * Login Happy Path Test
- * Testet den erfolgreichen Login mit korrekten Zugangsdaten (inkl. 2FA)
+ * Testet den erfolgreichen Login mit korrekten Zugangsdaten (inkl. Login Challenge)
  */
 test.describe('CHECK24 Login - Happy Path', () => {
-  test('Erfolgreicher Login mit korrekten Zugangsdaten', async ({ page }) => {
+  test('Erfolgreicher Login - Account mit nur E-Mail (Login Challenge)', async ({ page }) => {
+    // Account mit nur E-Mail-Adresse verwenden
+    const credentials = getAccountCredentials('EMAIL_ONLY');
+    console.log(`📧 Verwende Test-Account: ${credentials.account.description}`);
+
     // Login durchführen (E-Mail + Passwort)
-    const { email } = await loginWithPassword(page);
+    const { email } = await loginWithPassword(page, credentials.email, credentials.password);
     console.log(`✅ Login-Daten eingegeben für: ${email}`);
 
-    // Login-Challenge behandeln (falls vorhanden)
+    // Login-Challenge behandeln (Sicherheitsprüfung bei unbekanntem Gerät)
     const hadChallenge = await handleLoginChallenge(page);
     
     if (hadChallenge) {
-      console.log('✅ Login-Challenge (2FA) erfolgreich bestanden');
+      console.log('✅ Login-Challenge erfolgreich bestanden (TAN-Code aus E-Mail)');
     }
 
     // Erfolgreichen Login verifizieren
@@ -26,7 +31,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
 
     // Screenshot nach erfolgreichem Login
     await page.screenshot({ 
-      path: `test-results/screenshots/login-success-${Date.now()}.png`,
+      path: `test-results/screenshots/login-success-${credentials.account.id}-${Date.now()}.png`,
       fullPage: true 
     });
 

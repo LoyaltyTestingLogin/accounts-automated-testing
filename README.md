@@ -20,8 +20,12 @@ check24-login-testing/
 ├── tests/                          # Playwright E2E Tests
 │   ├── login/                      # Login-Testsuites
 │   │   └── password-happy-path.spec.ts
-│   └── helpers/                    # Test-Utilities & Fixtures
-│       └── auth.ts
+│   ├── fixtures/                   # Test-Accounts & Fixtures
+│   │   ├── accounts.ts             # Multi-Account-System
+│   │   └── README.md
+│   └── helpers/                    # Test-Utilities
+│       ├── auth.ts
+│       └── email.ts
 ├── src/                            # Backend & Worker
 │   ├── api/                        # Express API
 │   │   └── server.ts
@@ -199,7 +203,11 @@ Der Worker führt automatisch Tests in konfigurierbaren Intervallen aus:
    curl -X POST http://localhost:4000/api/test-slack
    ```
 
-### 2FA Login-Challenge (Microsoft Graph API)
+### Login Challenge - TAN-Code aus E-Mail auslesen (Microsoft Graph API)
+
+**WICHTIG:** Login Challenge ≠ 2FA
+- **Login Challenge**: Sicherheitsprüfung bei unbekanntem Gerät/Inkognito (kommt immer)
+- **2FA**: Nur wenn in Account-Einstellungen aktiviert (optional)
 
 Die automatische Behandlung von TAN-Codes per E-Mail ist **bereits eingerichtet**.
 

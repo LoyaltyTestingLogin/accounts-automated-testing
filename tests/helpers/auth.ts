@@ -165,7 +165,8 @@ export async function logout(page: Page) {
 }
 
 /**
- * Login-Challenge Handler (2FA TAN-Code)
+ * Login-Challenge Handler (Sicherheitsprüfung bei unbekanntem Gerät)
+ * WICHTIG: Dies ist NICHT 2FA, sondern eine Login Challenge die bei unbekanntem Gerät/Inkognito kommt
  * Vollständiger Flow:
  * 1. Screen "Kurze Sicherheitsüberprüfung" erkennen
  * 2. Auf "Weiter" klicken → E-Mail wird versendet

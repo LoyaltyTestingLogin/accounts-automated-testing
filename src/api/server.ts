@@ -200,9 +200,9 @@ app.get('/api/test-suites', (req, res) => {
     data: [
       {
         id: 'login-happy',
-        name: 'Login - Erfolgreicher Login',
+        name: 'Login - Erfolgreicher Login mit Login Challenge',
         path: 'tests/login/password-happy-path.spec.ts',
-        description: 'Testet den erfolgreichen Login-Flow mit gültigen Zugangsdaten. Prüft die korrekte Navigation zum Kundenbereich und alle Login-Schritte (E-Mail → Weiter → Passwort → Anmelden).',
+        description: 'Vollständiger Login-Flow mit Sicherheitsprüfung: E-Mail → Passwort → Login Challenge (TAN-Code wird automatisch aus E-Mail ausgelesen) → Erfolgreicher Zugriff auf Kundenbereich.',
       },
     ],
   });

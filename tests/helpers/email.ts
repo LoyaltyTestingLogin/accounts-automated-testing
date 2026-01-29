@@ -23,7 +23,7 @@ export class EmailClient {
     this.mailbox = process.env.EMAIL_ACCOUNT || 'loyaltytesting@check24.de';
 
     if (!tenantId || !clientId || !clientSecret) {
-      console.warn('⚠️  Azure credentials not configured. 2FA tests will fail.');
+      console.warn('⚠️  Azure credentials not configured. Login Challenge tests will fail.');
       return;
     }
 
