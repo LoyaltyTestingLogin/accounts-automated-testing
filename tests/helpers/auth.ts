@@ -54,33 +54,13 @@ export async function loginWithPassword(page: Page, email?: string, password?: s
   console.log('🔐 SCHRITT 2: Gebe Passwort ein...');
   await page.waitForTimeout(200);
   await passwordInput.fill(testPassword, { force: true });
-  await page.waitForTimeout(800);
-
-  // Klick auf "Anmelden"-Button (finaler Submit)
-  console.log('🖱️  Klicke auf "Anmelden"-Button...');
+  
+  // Direkt Enter drücken nach Passwort-Eingabe (schnellster Weg)
+  console.log('⏎  Drücke Enter zum Anmelden...');
+  await passwordInput.press('Enter');
+  console.log('✅ Enter-Taste gedrückt');
+  
   await page.waitForTimeout(500);
-  
-  // Button-Selektor - es ist der Submit-Button
-  const anmeldenButton = page.locator('button[type="submit"]').first();
-  
-  try {
-    // Explizit warten bis Button visible ist
-    await anmeldenButton.waitFor({ state: 'visible', timeout: 8000 });
-    await anmeldenButton.click({ force: true });
-    console.log('✅ "Anmelden"-Button wurde geklickt');
-  } catch (e) {
-    console.log('⚠️  "Anmelden"-Button nicht visible, versuche force-click...');
-    try {
-      await anmeldenButton.click({ force: true, timeout: 3000 });
-      console.log('✅ "Anmelden"-Button wurde geklickt (force)');
-    } catch (e2) {
-      console.log('⚠️  Button-Klick fehlgeschlagen, versuche Enter-Taste...');
-      await passwordInput.press('Enter');
-      console.log('✅ Enter-Taste gedrückt');
-    }
-  }
-  
-  await page.waitForTimeout(800);
 
   // Warten auf Navigation nach Login
   await page.waitForLoadState('networkidle', { timeout: 30000 });
