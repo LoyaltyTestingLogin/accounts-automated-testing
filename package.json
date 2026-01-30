@@ -1,7 +1,7 @@
 {
-  "name": "check24-login-testing",
+  "name": "testimate",
   "version": "1.0.0",
-  "description": "Automatisiertes E2E Testing für CHECK24 Login mit 24/7 Monitoring",
+  "description": "Testimate - Automatisiertes E2E Testing für CHECK24 Login mit 24/7 Monitoring",
   "private": true,
   "scripts": {
     "install:playwright": "playwright install chromium",

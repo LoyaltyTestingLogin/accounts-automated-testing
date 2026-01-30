@@ -121,7 +121,7 @@ export default function LiveLogPage() {
       {/* Footer */}
       <div className="px-6 py-3 bg-gray-800 border-t border-gray-700 flex items-center justify-between">
         <div className="text-sm text-gray-400">
-          CHECK24 Login Testing • Live-Monitoring
+          <span className="font-semibold text-gray-300">Testimate</span> • CHECK24 Login Testing • Live-Monitoring
         </div>
         {isComplete && (
           <div className="text-sm text-green-400 flex items-center gap-2">

@@ -1,4 +1,6 @@
-# CHECK24 Login Testing System
+# Testimate
+
+**CHECK24 Login Testing System**
 
 Automatisiertes End-to-End-Frontend-Testing des CHECK24-Logins mit Playwright, Web-Dashboard und 24/7-Monitoring.
 

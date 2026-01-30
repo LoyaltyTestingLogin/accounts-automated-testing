@@ -5,8 +5,8 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'CHECK24 Login Testing Dashboard',
-  description: 'Automatisiertes E2E Testing für CHECK24 Login mit 24/7 Monitoring',
+  title: 'Testimate - CHECK24 Login Testing',
+  description: 'Testimate: Automatisiertes E2E Testing für CHECK24 Login mit 24/7 Monitoring',
 };
 
 export default function RootLayout({
