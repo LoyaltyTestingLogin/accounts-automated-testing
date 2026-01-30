@@ -83,7 +83,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
     }
   });
 
-  test('Erfolgreicher Login - Combined Account mit SMS-TAN (Selection)', async ({ browser }) => {
+  test('Erfolgreicher Login - Combined Account mit SMS-TAN (via iPhone-Weiterleitung)', async ({ browser }) => {
     // Neuen Browser-Context erstellen (ohne Cookies)
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -102,142 +102,301 @@ test.describe('CHECK24 Login - Happy Path', () => {
       // Login-Challenge behandeln - WICHTIG: Phone-Methode explizit auswählen
       console.log('📱 Wähle SMS/Telefon als Challenge-Methode...');
       
-      // Prüfe auf Login-Challenge Screen
       await page.waitForTimeout(2000);
-      const currentUrl = page.url();
-      const pageTitle = await page.title();
-      console.log(`📍 Aktuelle URL: ${currentUrl}`);
-      console.log(`📄 Seitentitel: ${pageTitle}`);
       
-      // Debug: Zeige Seiteninhalt
+      // Prüfe auf Login-Challenge Screen
       const bodyText = await page.locator('body').textContent() || '';
-      console.log(`📄 Seiteninhalt (erste 400 Zeichen): ${bodyText.substring(0, 400)}...`);
-      
       const hasSecurityCheck = bodyText.toLowerCase().includes('sicherheit');
       
       if (hasSecurityCheck) {
         console.log('✅ Sicherheitsüberprüfung-Screen erkannt');
         
-        // Debug: Liste alle Labels auf der Seite
-        const allLabels = await page.locator('label').all();
-        console.log(`🏷️  Gefundene Labels (${allLabels.length}):`);
-        for (let i = 0; i < Math.min(allLabels.length, 15); i++) {
-          const labelText = await allLabels[i].textContent();
-          console.log(`   ${i + 1}. "${labelText?.trim()}"`);
+        // Verwende selectChallengeMethod für SMS-Auswahl
+        const { selectChallengeMethod } = await import('../helpers/auth.js');
+        await selectChallengeMethod(page, 'phone');
+        
+        console.log('⏳ Warte nach SMS-Auswahl, damit UI aktualisiert wird...');
+        await page.waitForTimeout(2000);
+        
+        // WICHTIG: Jetzt den richtigen "Weiter"-Button finden und klicken
+        console.log('➡️  Suche "Weiter"-Button um SMS zu versenden...');
+        
+        // Debug: Liste alle Buttons
+        const allButtonsDebug = await page.locator('button, a[role="button"]').all();
+        console.log(`🔍 Alle verfügbaren Buttons (${allButtonsDebug.length}):`);
+        for (let i = 0; i < Math.min(allButtonsDebug.length, 15); i++) {
+          const btnText = await allButtonsDebug[i].textContent();
+          const btnType = await allButtonsDebug[i].getAttribute('type');
+          const isVisible = await allButtonsDebug[i].isVisible();
+          console.log(`   ${i + 1}. "${btnText?.trim()}" (type: ${btnType}, visible: ${isVisible})`);
         }
         
-        // Erweiterte SMS/Telefon-Selektoren
-        const smsSelectors = [
-          'label:has-text("SMS")',
-          'label:has-text("Telefon")',
-          'label:has-text("Handynummer")',
-          'label:has-text("Mobilnummer")',
-          'input[type="radio"][value*="sms"]',
-          'input[type="radio"][value*="phone"]',
-          'button:has-text("SMS")',
-          'button:has-text("Telefon")',
+        // Gleiche Button-Logik wie in handleLoginChallenge
+        const submitButtonSelectors = [
+          'button:has-text("Code senden")',
+          'button:has-text("code senden")',
+          'button:has-text("Senden")',
+          'button[type="submit"]:has-text("Weiter")',
+          'button:has-text("Weiter")',
+          '[role="button"]:has-text("Code senden")',
         ];
         
-        let smsSelected = false;
-        for (const selector of smsSelectors) {
-          try {
-            const element = page.locator(selector).first();
-            if (await element.count() > 0) {
-              console.log(`🔍 SMS-Option gefunden: ${selector}`);
-              const elemText = await element.textContent();
-              console.log(`   Element-Text: "${elemText?.trim()}"`);
-              
-              // Versuche Click
-              try {
-                await element.click({ force: true, timeout: 3000 });
-                console.log(`✅ SMS-Option ausgewählt (normal click)`);
-                smsSelected = true;
-                await page.waitForTimeout(1000);
+        let submitButton = null;
+        
+        for (const selector of submitButtonSelectors) {
+          const locator = page.locator(selector).first();
+          const count = await locator.count();
+          
+          if (count > 0) {
+            console.log(`🔍 Button gefunden mit Selektor: ${selector}`);
+            try {
+              if (await locator.isVisible({ timeout: 2000 })) {
+                const buttonText = await locator.textContent();
+                submitButton = locator;
+                console.log(`✅ Sichtbarer Submit-Button gefunden: ${selector} (Text: "${buttonText?.trim()}")`);
                 break;
-              } catch (clickErr) {
-                // JavaScript-Fallback
-                try {
-                  await element.evaluate((el: any) => el.click());
-                  console.log(`✅ SMS-Option ausgewählt (JavaScript click)`);
-                  smsSelected = true;
-                  await page.waitForTimeout(1000);
-                  break;
-                } catch (jsErr) {
-                  console.log(`⚠️  Klick fehlgeschlagen auf ${selector}`);
-                }
               }
+            } catch (e) {
+              console.log(`⚠️  Button nicht sichtbar: ${selector}`);
             }
-          } catch (e) {
-            continue;
           }
         }
         
-        if (smsSelected) {
-          // Cookie-Banner wegklicken falls vorhanden
-          await page.waitForTimeout(500);
-          try {
-            const cookieButton = page.locator('a:has-text("Nur notwendige"), button:has-text("Nur notwendige")').first();
-            if (await cookieButton.count() > 0) {
-              await cookieButton.click({ force: true, timeout: 2000 });
-              console.log('✅ Cookie-Banner weggeklickt');
-              await page.waitForTimeout(500);
+        // Fallback: Suche sichtbaren "weiter"-Button
+        if (!submitButton) {
+          console.log('🔍 Kein spezifischer Button gefunden, suche sichtbaren "weiter"-Button...');
+          const weiterButtons = await page.locator('button[type="submit"]').all();
+          for (const btn of weiterButtons) {
+            try {
+              if (await btn.isVisible()) {
+                const buttonText = (await btn.textContent() || '').toLowerCase();
+                if (buttonText.includes('weiter')) {
+                  submitButton = btn;
+                  console.log(`✅ Sichtbaren "weiter"-Button gefunden (Text: "${buttonText.trim()}")`);
+                  break;
+                }
+              }
+            } catch (e) {
+              // Weiter
             }
-          } catch (e) {
-            console.log('ℹ️  Kein Cookie-Banner oder bereits geschlossen');
           }
-          
-          // Klick auf "Weiter" um SMS zu versenden
-          await page.waitForTimeout(500);
-          const weiterButton = page.locator('button:has-text("Weiter"), button[type="submit"]').first();
-          
+        }
+        
+        if (submitButton) {
           try {
-            await weiterButton.click({ force: true, timeout: 5000 });
-            console.log('✅ "Weiter" geklickt - SMS wird versendet');
-          } catch (clickErr) {
-            // JavaScript-Fallback
-            console.log('⚠️  Normaler Click fehlgeschlagen, versuche JavaScript...');
-            await weiterButton.evaluate((btn: any) => btn.click());
-            console.log('✅ "Weiter" geklickt via JavaScript - SMS wird versendet');
-          }
-          
-          await page.waitForTimeout(3000);
-          
-          console.log('⏸️  Test pausiert hier - SMS-Code-Extraktion noch nicht implementiert');
-          console.log('📱 SMS sollte jetzt an die Nummer gesendet worden sein: ' + credentials.account.phone);
-          
-          // Debug: Zeige aktuellen Screen
-          const afterUrl = page.url();
-          const afterTitle = await page.title();
-          console.log(`📍 URL nach SMS-Versand: ${afterUrl}`);
-          console.log(`📄 Titel: ${afterTitle}`);
-          
-          // Screenshot vom SMS-Code-Eingabe-Screen
-          await page.screenshot({ 
-            path: `test-results/screenshots/sms-code-screen-${Date.now()}.png`,
-            fullPage: true 
-          });
-          
-          // Prüfe ob SMS-Code-Eingabefeld vorhanden ist
-          const smsCodeInput = page.locator('input[name*="code"], input[id*="code"], input[type="text"]').first();
-          if (await smsCodeInput.count() > 0) {
-            console.log('✅ SMS-Code-Eingabefeld gefunden');
-          } else {
-            console.log('⚠️  SMS-Code-Eingabefeld nicht gefunden');
+            console.log('🖱️  Klicke auf Submit-Button...');
+            await submitButton.click({ force: true, timeout: 5000 });
+            console.log('✅ Submit-Button geklickt - SMS wird versendet');
+          } catch (e) {
+            console.log(`⚠️  Click fehlgeschlagen: ${e}`);
+            console.log('⌨️  Versuche Enter-Taste...');
+            await page.keyboard.press('Enter');
           }
         } else {
-          console.log('⚠️  SMS-Option konnte nicht gefunden/ausgewählt werden');
-          
-          // Screenshot für Debugging
-          await page.screenshot({ 
-            path: `test-results/screenshots/sms-selection-failed-${Date.now()}.png`,
-            fullPage: true 
-          });
+          console.log('⚠️  Kein Submit-Button gefunden, versuche Enter...');
+          await page.keyboard.press('Enter');
         }
+        
+        await page.waitForTimeout(3000);
+        
+        console.log('📱 SMS wird jetzt an die Nummer gesendet: ' + credentials.account.phone);
+        console.log('📧 Warte auf weitergeleitete SMS per Email von iPhone...');
+        
+        // Debug: Zeige aktuellen Screen
+        const afterUrl = page.url();
+        const afterTitle = await page.title();
+        console.log(`📍 URL nach SMS-Versand: ${afterUrl}`);
+        console.log(`📄 Titel: ${afterTitle}`);
+        
+        // SCHRITT: Warte auf SMS-Code-Eingabefeld
+        console.log('🔍 Warte auf SMS-Code-Eingabefeld...');
+        
+        const smsInputSelectors = [
+          'input[name*="tan"]:not([name*="zip"])',
+          'input[name*="otp"]',
+          'input[name="challenge_code"]',
+          'input[name="verification_code"]',
+          'input[id*="tan"]',
+          'input[id*="otp"]',
+          'input[placeholder*="Code"]:not([placeholder*="Postleitzahl"])',
+          'input[placeholder*="code"]:not([placeholder*="Postleitzahl"])',
+          'input[type="text"][inputmode="numeric"]:not([name*="zip"]):not([name*="phone"])',
+          'input[type="tel"]:not([name*="zip"]):not([name*="phone"])',
+          'input[type="text"]:not([name*="zip"]):not([name*="phone"]):not([name*="email"])',
+        ];
+        
+        let smsCodeInput = null;
+        for (const selector of smsInputSelectors) {
+          const locator = page.locator(selector).first();
+          if (await locator.count() > 0) {
+            console.log(`✅ SMS-Code-Eingabefeld gefunden: ${selector}`);
+            smsCodeInput = locator;
+            break;
+          }
+        }
+        
+        if (!smsCodeInput) {
+          throw new Error('SMS-Code-Eingabefeld nicht gefunden');
+        }
+        
+        // SCHRITT: Hole SMS-Code aus weitergeleiteter Email (vom iPhone-Kurzbefehl)
+        console.log('📧 Warte auf weitergeleitete SMS-Email von ulitesting@icloud.com...');
+        
+        const { getEmailClient } = await import('../helpers/email.js');
+        const emailClient = getEmailClient();
+        
+        // Warte auf Email von iPhone-Kurzbefehl (Absender: ulitesting@icloud.com)
+        const smsEmail = await emailClient.waitForEmail(
+          {
+            from: 'ulitesting@icloud.com', // iPhone-Kurzbefehl sendet von hier
+          },
+          120000, // 2 Minuten Timeout (SMS kann etwas länger dauern)
+          3000
+        );
+        
+        if (!smsEmail) {
+          throw new Error('SMS-Weiterleitungs-Email vom iPhone nicht erhalten (Timeout nach 2 Minuten)');
+        }
+        
+        console.log(`✅ SMS-Weiterleitungs-Email erhalten von: ${smsEmail.from}`);
+        console.log(`📧 Betreff: ${smsEmail.subject}`);
+        
+        // Extrahiere TAN-Code aus der Email (gleiche Logik wie bei Email-TAN)
+        const smsCode = emailClient.extractTanCode(smsEmail);
+        
+        if (!smsCode) {
+          throw new Error('SMS-Code konnte nicht aus weitergeleiteter Email extrahiert werden');
+        }
+        
+        console.log(`🔑 SMS-Code erhalten: ${smsCode}`);
+        
+        // SCHRITT: SMS-Code eingeben
+        await page.waitForTimeout(500);
+        
+        try {
+          await smsCodeInput.fill(smsCode, { timeout: 5000 });
+          console.log('✅ SMS-Code eingegeben');
+        } catch (fillError) {
+          // JavaScript-Fallback
+          console.log('⚠️  Normales fill() fehlgeschlagen, versuche JavaScript...');
+          await smsCodeInput.evaluate((el: any, code: string) => {
+            el.value = code;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          }, smsCode);
+          console.log('✅ SMS-Code eingegeben (via JavaScript)');
+        }
+        
+        await page.waitForTimeout(500);
+        
+        // SCHRITT: Login abschließen (Enter oder Button)
+        console.log('➡️  Schließe Login ab...');
+        
+        try {
+          await smsCodeInput.press('Enter');
+          console.log('✅ Enter gedrückt');
+        } catch (enterError) {
+          // Button-Fallback
+          const submitButton = page.locator('button[type="submit"], button:has-text("Weiter"), button:has-text("Bestätigen")').first();
+          if (await submitButton.count() > 0) {
+            await submitButton.click({ force: true });
+            console.log('✅ Submit-Button geklickt');
+          }
+        }
+        
+        await page.waitForTimeout(3000);
+        
+        // SCHRITT: Telefonnummer-Screen überspringen (falls vorhanden)
+        const bodyTextAfterSMS = await page.locator('body').textContent() || '';
+        
+        if (bodyTextAfterSMS.toLowerCase().includes('telefonnummer')) {
+          console.log('📱 Telefonnummer-Screen erkannt - klicke "später erinnern"...');
+          
+          const laterButtonSelectors = [
+            'button:has-text("später")',
+            'a:has-text("später")',
+            'button:has-text("Später")',
+            'a:has-text("Später")',
+            '[class*="skip"]',
+          ];
+          
+          let laterClicked = false;
+          for (const selector of laterButtonSelectors) {
+            try {
+              const button = page.locator(selector).first();
+              if (await button.count() > 0) {
+                await button.click({ force: true, timeout: 3000 });
+                console.log(`✅ "später erinnern" geklickt (${selector})`);
+                laterClicked = true;
+                await page.waitForTimeout(2000);
+                break;
+              }
+            } catch (e) {
+              // Versuche JavaScript
+              try {
+                const button = page.locator(selector).first();
+                if (await button.count() > 0) {
+                  await button.evaluate((btn: any) => btn.click());
+                  console.log(`✅ "später erinnern" geklickt via JavaScript (${selector})`);
+                  laterClicked = true;
+                  await page.waitForTimeout(2000);
+                  break;
+                }
+              } catch (jsErr) {
+                continue;
+              }
+            }
+          }
+          
+          if (!laterClicked) {
+            console.log('⚠️  "später erinnern" Button nicht gefunden - fahre trotzdem fort');
+          }
+        }
+        
+        // SCHRITT: Login-Erfolg verifizieren mit c24session Cookie
+        console.log('🔍 Prüfe Login-Erfolg mit c24session Cookie...');
+        
+        await page.waitForTimeout(2000);
+        
+        const cookies = await page.context().cookies();
+        const c24sessionCookie = cookies.find(cookie => cookie.name === 'c24session');
+        
+        if (c24sessionCookie) {
+          console.log(`✅ c24session Cookie gefunden: ${c24sessionCookie.value.substring(0, 20)}...`);
+          console.log(`   Domain: ${c24sessionCookie.domain}`);
+          console.log(`   Expires: ${c24sessionCookie.expires ? new Date(c24sessionCookie.expires * 1000).toISOString() : 'Session'}`);
+        } else {
+          console.log('⚠️  c24session Cookie NICHT gefunden - Login möglicherweise fehlgeschlagen');
+          console.log('📋 Vorhandene Cookies:', cookies.map(c => c.name).join(', '));
+          throw new Error('Login nicht vollständig: c24session Cookie fehlt');
+        }
+        
+        const finalUrl = page.url();
+        console.log(`📍 Finale URL: ${finalUrl}`);
+        
+        // Prüfe ob wir auf Kundenbereich sind
+        if (finalUrl.includes('kundenbereich.check24.de')) {
+          console.log('✅ Erfolgreich auf Kundenbereich weitergeleitet');
+        } else if (finalUrl.includes('process=failed')) {
+          throw new Error('Login fehlgeschlagen: URL zeigt process=failed');
+        }
+        
+        console.log('✅ Login vollständig erfolgreich mit SMS-TAN (via iPhone-Weiterleitung)');
+        
+        // Screenshot vom erfolgreichen Login
+        await page.screenshot({ 
+          path: `test-results/screenshots/sms-login-success-${Date.now()}.png`,
+          fullPage: true 
+        });
+        
+        // Logout
+        const { logout } = await import('../helpers/auth.js');
+        await logout(page);
       } else {
         console.log('ℹ️  Keine Login-Challenge erkannt');
       }
 
-      console.log(`ℹ️  Test beendet (bis SMS-Code-Screen) für Combined Account: ${email}`);
+      console.log(`✅ Test erfolgreich abgeschlossen für Combined Account (SMS-TAN): ${email}`);
     } finally {
       await context.close();
     }
