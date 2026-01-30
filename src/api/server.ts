@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { getDatabase } from '../database/schema';
-import { getPlaywrightRunner } from '../runner/playwright-runner';
+import { getPlaywrightRunner, testLogEmitter } from '../runner/playwright-runner';
 import { getSlackNotifier } from '../slack/notifier';
 
 dotenv.config();
@@ -135,11 +135,24 @@ app.get('/api/statistics', (req, res) => {
 
 /**
  * POST /api/run-tests
- * Startet Tests manuell
+ * Startet Tests manuell und gibt die Run-ID zurück
  */
 app.post('/api/run-tests', async (req, res) => {
   try {
     const { testPath, project, headed } = req.body;
+
+    // Erstelle Test-Run sofort und gebe ID zurück
+    const testName = testPath || 'All Tests';
+    const runId = db.createTestRun({
+      testName,
+      testSuite: 'Manual',
+      status: 'pending',
+      startTime: new Date().toISOString(),
+      triggeredBy: 'manual',
+      progress: 0,
+      totalTests: 1,
+      completedTests: 0,
+    });
 
     // Test-Run im Hintergrund starten (nicht blockierend)
     setImmediate(async () => {
@@ -149,6 +162,7 @@ app.post('/api/run-tests', async (req, res) => {
           project,
           headed: headed || false,
           triggeredBy: 'manual',
+          existingRunId: runId, // Verwende die bereits erstellte Run-ID
         });
       } catch (error) {
         console.error('Fehler beim Test-Run:', error);
@@ -159,6 +173,7 @@ app.post('/api/run-tests', async (req, res) => {
       success: true,
       message: 'Tests gestartet',
       testPath: testPath || 'tests/login',
+      runId, // Gebe Run-ID zurück für Live-Logs
     });
   } catch (error: any) {
     console.error('Fehler beim Starten der Tests:', error);
@@ -167,6 +182,52 @@ app.post('/api/run-tests', async (req, res) => {
       error: error.message,
     });
   }
+});
+
+/**
+ * GET /api/test-logs/:runId/stream
+ * Streamt Live-Logs für einen Test-Run (Server-Sent Events)
+ */
+app.get('/api/test-logs/:runId/stream', (req, res) => {
+  const runId = parseInt(req.params.runId);
+  
+  // SSE Headers setzen
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Initiale Verbindungsnachricht
+  res.write(`data: ${JSON.stringify({ type: 'connected', runId })}\n\n`);
+
+  // Log-Listener für diesen Run
+  const logListener = (logData: any) => {
+    if (logData.runId === runId) {
+      res.write(`data: ${JSON.stringify(logData)}\n\n`);
+    }
+  };
+
+  // Complete-Listener
+  const completeListener = (data: any) => {
+    if (data.runId === runId) {
+      res.write(`data: ${JSON.stringify({ type: 'complete', runId })}\n\n`);
+      cleanup();
+    }
+  };
+
+  // Event-Listener registrieren
+  testLogEmitter.on('log', logListener);
+  testLogEmitter.on('complete', completeListener);
+
+  // Cleanup-Funktion
+  const cleanup = () => {
+    testLogEmitter.off('log', logListener);
+    testLogEmitter.off('complete', completeListener);
+    res.end();
+  };
+
+  // Verbindung geschlossen
+  req.on('close', cleanup);
 });
 
 /**
@@ -214,7 +275,7 @@ app.get('/api/test-suites', (req, res) => {
         id: 'login-password-reset',
         name: 'Login - Passwort Reset',
         path: 'tests/login/password-reset.spec.ts',
-        description: 'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n\n• Test 2: Combined Account (TAN per E-Mail + Selection Screen)\n\n• Test 3: Combined Account (TAN per SMS + Selection Screen)',
+        description: 'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
       },
     ],
   });
@@ -341,6 +402,7 @@ function startServer() {
     console.log(`   GET  /api/test-runs/:id`);
     console.log(`   GET  /api/statistics`);
     console.log(`   GET  /api/test-suites`);
+    console.log(`   GET  /api/test-logs/:runId/stream (SSE)`);
     console.log(`   GET  /api/scheduler/status`);
     console.log(`   POST /api/run-tests`);
     console.log(`   POST /api/test-slack`);

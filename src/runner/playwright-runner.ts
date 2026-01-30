@@ -1,12 +1,16 @@
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFile, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { getDatabase, TestRunInsert } from '../database/schema';
 import { getSlackNotifier } from '../slack/notifier';
+import { EventEmitter } from 'events';
 
 const execAsync = promisify(exec);
+
+// Event-Emitter für Live-Logs
+export const testLogEmitter = new EventEmitter();
 
 /**
  * Playwright Test Runner
@@ -18,6 +22,7 @@ export interface TestRunOptions {
   project?: string;   // Browser-Projekt (chromium, firefox, etc.)
   headed?: boolean;   // Im headed mode ausführen
   triggeredBy: 'manual' | 'scheduled';
+  existingRunId?: number; // Optionale existierende Run-ID für Live-Logs
 }
 
 export interface TestResult {
@@ -42,27 +47,41 @@ export class PlaywrightRunner {
    * Führt Playwright-Tests aus
    */
   async runTests(options: TestRunOptions): Promise<TestResult[]> {
-    const { testPath, project, headed, triggeredBy } = options;
+    const { testPath, project, headed, triggeredBy, existingRunId } = options;
 
     console.log(`🧪 Starte Tests: ${testPath || 'alle Tests'}`);
 
-    // Test-Run in DB erstellen
+    // Test-Run in DB erstellen oder existierende verwenden
     const testName = testPath || 'All Tests';
     const testSuite = this.extractSuiteName(testPath);
 
-    // Schätze Anzahl der Tests (wird später beim Parsen aktualisiert)
-    const estimatedTests = testPath?.includes('password-happy-path') ? 1 : 1;
+    let runId: number;
+    
+    if (existingRunId) {
+      // Verwende existierende Run-ID und aktualisiere Status
+      runId = existingRunId;
+      this.db.updateTestRun(runId, {
+        status: 'running',
+        testName,
+        testSuite,
+      });
+      console.log(`📝 Verwende existierende Run-ID: ${runId}`);
+    } else {
+      // Schätze Anzahl der Tests (wird später beim Parsen aktualisiert)
+      const estimatedTests = testPath?.includes('password-happy-path') ? 1 : 1;
 
-    const runId = this.db.createTestRun({
-      testName,
-      testSuite,
-      status: 'running',
-      startTime: new Date().toISOString(),
-      triggeredBy,
-      progress: 0,
-      totalTests: estimatedTests,
-      completedTests: 0,
-    });
+      runId = this.db.createTestRun({
+        testName,
+        testSuite,
+        status: 'running',
+        startTime: new Date().toISOString(),
+        triggeredBy,
+        progress: 0,
+        totalTests: estimatedTests,
+        completedTests: 0,
+      });
+      console.log(`📝 Neue Run-ID erstellt: ${runId}`);
+    }
 
     const startTime = Date.now();
 
@@ -71,18 +90,12 @@ export class PlaywrightRunner {
       const command = this.buildPlaywrightCommand({ testPath, project, headed });
       
       console.log(`📝 Führe aus: ${command}`);
+      testLogEmitter.emit('log', { runId, message: `📝 Führe aus: ${command}\n`, timestamp: new Date().toISOString() });
 
-      // Tests ausführen
-      const { stdout, stderr } = await execAsync(command, {
-        cwd: process.cwd(),
-        env: { ...process.env },
-        maxBuffer: 10 * 1024 * 1024, // 10MB Buffer
-      });
+      // Tests mit Live-Streaming ausführen
+      await this.runTestsWithLiveOutput(command, runId);
 
       const duration = Date.now() - startTime;
-
-      console.log('📋 Playwright Output:', stdout);
-      if (stderr) console.error('⚠️  Playwright Errors:', stderr);
 
       // Ergebnisse parsen
       const results = await this.parseTestResults(runId, testName, testSuite, duration, triggeredBy);
@@ -191,6 +204,78 @@ export class PlaywrightRunner {
         artifacts: { screenshots: [], videos: [], traces: [] },
       }];
     }
+  }
+
+  /**
+   * Führt Tests mit Live-Output aus
+   */
+  private runTestsWithLiveOutput(command: string, runId: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Kommando in Teile aufteilen für spawn
+      const [cmd, ...args] = command.split(' ');
+      
+      const childProcess = spawn(cmd, args, {
+        cwd: process.cwd(),
+        env: { ...process.env, FORCE_COLOR: '0' }, // Keine Farb-Codes für saubere Logs
+        shell: true,
+      });
+
+      // STDOUT in Echtzeit streamen
+      childProcess.stdout.on('data', (data: Buffer) => {
+        const message = data.toString();
+        console.log(message);
+        testLogEmitter.emit('log', {
+          runId,
+          message,
+          timestamp: new Date().toISOString(),
+          type: 'stdout',
+        });
+      });
+
+      // STDERR in Echtzeit streamen
+      childProcess.stderr.on('data', (data: Buffer) => {
+        const message = data.toString();
+        console.error(message);
+        testLogEmitter.emit('log', {
+          runId,
+          message,
+          timestamp: new Date().toISOString(),
+          type: 'stderr',
+        });
+      });
+
+      // Prozess-Ende
+      childProcess.on('close', (code) => {
+        const message = `\n✅ Test-Prozess beendet mit Code ${code}\n`;
+        console.log(message);
+        testLogEmitter.emit('log', {
+          runId,
+          message,
+          timestamp: new Date().toISOString(),
+          type: 'system',
+        });
+        testLogEmitter.emit('complete', { runId });
+        
+        if (code === 0) {
+          resolve();
+        } else {
+          // Bei Exit-Code 1 ist das okay (Tests failed, aber Playwright lief durch)
+          resolve();
+        }
+      });
+
+      // Fehlerbehandlung
+      childProcess.on('error', (error) => {
+        console.error('Process error:', error);
+        testLogEmitter.emit('log', {
+          runId,
+          message: `❌ Fehler: ${error.message}\n`,
+          timestamp: new Date().toISOString(),
+          type: 'error',
+        });
+        reject(error);
+      });
+    });
   }
 
   /**
