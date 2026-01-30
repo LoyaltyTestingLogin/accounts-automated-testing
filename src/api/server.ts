@@ -204,6 +204,12 @@ app.get('/api/test-suites', (req, res) => {
         path: 'tests/login/password-happy-path.spec.ts',
         description: 'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
       },
+      {
+        id: 'login-otp',
+        name: 'Login - OTP (Einmalcode) Login',
+        path: 'tests/login/otp-happy-path.spec.ts',
+        description: 'Vollständiger OTP Login-Flow mit Einmalcode statt Passwort\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
+      },
     ],
   });
 });
