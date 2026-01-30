@@ -226,10 +226,56 @@ export class PlaywrightRunner {
         shell: true,
       });
 
+      // Tracking für Live-Progress
+      let completedTestsCount = 0;
+      const testRun = this.db.getTestRun(runId);
+      const totalTests = testRun?.totalTests || 1;
+
       // STDOUT in Echtzeit streamen
       childProcess.stdout.on('data', (data: Buffer) => {
         const message = data.toString();
         console.log(message);
+        
+        // Parse Playwright Output für Live-Progress
+        // Suche nach Patterns wie "[1/3]" oder "✓ Test Name" oder "✘ Test Name"
+        const testCompletionPatterns = [
+          /\[(\d+)\/\d+\]/,  // [1/3] Format
+          /✓\s+/,             // ✓ Test passed
+          /✘\s+/,             // ✘ Test failed
+          /×\s+/,             // × Test failed (alternative)
+        ];
+
+        for (const pattern of testCompletionPatterns) {
+          const match = message.match(pattern);
+          if (match) {
+            if (match[1]) {
+              // Extrahiere completed count aus [X/Y] Format
+              const completed = parseInt(match[1], 10);
+              if (completed > completedTestsCount) {
+                completedTestsCount = completed;
+                const progress = Math.round((completedTestsCount / totalTests) * 100);
+                
+                // Update Progress in DB
+                this.db.updateTestRun(runId, {
+                  progress,
+                  completedTests: completedTestsCount,
+                });
+              }
+            } else {
+              // ✓ oder ✘ gefunden - increment counter
+              completedTestsCount++;
+              const progress = Math.round((completedTestsCount / totalTests) * 100);
+              
+              // Update Progress in DB
+              this.db.updateTestRun(runId, {
+                progress,
+                completedTests: completedTestsCount,
+              });
+            }
+            break; // Nur einmal pro Message
+          }
+        }
+        
         testLogEmitter.emit('log', {
           runId,
           message,
