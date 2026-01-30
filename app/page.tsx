@@ -73,34 +73,23 @@ export default function Dashboard() {
     return `~${seconds} Sek`;
   };
 
-  const calculateEstimatedDuration = (runs: TestRun[], suites: TestSuite[]) => {
-    // Berechne durchschnittliche Dauer pro Test-Suite basierend auf erfolgreichen Runs
-    const suiteAverages = new Map<string, number>();
+  const calculateEstimatedDuration = (runs: TestRun[]) => {
+    // Filtere alle "All Tests" Runs die erfolgreich waren
+    const allTestsRuns = runs.filter(
+      run => run.testName === 'All Tests' && 
+             run.status === 'passed' && 
+             run.duration !== null
+    );
     
-    suites.forEach(suite => {
-      const suiteName = suite.name;
-      const suiteRuns = runs.filter(
-        run => run.testSuite === suiteName && 
-               run.status === 'passed' && 
-               run.duration !== null
-      );
-      
-      if (suiteRuns.length > 0) {
-        const avgDuration = suiteRuns.reduce((sum, run) => sum + (run.duration || 0), 0) / suiteRuns.length;
-        suiteAverages.set(suiteName, avgDuration);
-      } else {
-        // Fallback: 30 Sekunden wenn keine Historie vorhanden
-        suiteAverages.set(suiteName, 30000);
-      }
-    });
-    
-    // Summiere alle durchschnittlichen Dauern (sequenzielle Ausführung)
-    if (suiteAverages.size > 0) {
-      const totalDuration = Array.from(suiteAverages.values()).reduce((sum, dur) => sum + dur, 0);
-      setEstimatedTotalDuration(totalDuration);
-    } else {
+    if (allTestsRuns.length === 0) {
+      // Keine Daten vorhanden - zeige nichts an
       setEstimatedTotalDuration(null);
+      return;
     }
+    
+    // Berechne Durchschnitt aller erfolgreichen "All Tests" Runs
+    const avgDuration = allTestsRuns.reduce((sum, run) => sum + (run.duration || 0), 0) / allTestsRuns.length;
+    setEstimatedTotalDuration(avgDuration);
   };
 
   const fetchData = async () => {
@@ -122,8 +111,8 @@ export default function Dashboard() {
         setSchedulerPaused(schedulerRes.data.data.isPaused || false);
       }
       
-      // Berechne geschätzte Gesamtdauer aller Tests (sequenziell)
-      calculateEstimatedDuration(runsRes.data.data || [], suitesRes.data.data || []);
+      // Berechne geschätzte Gesamtdauer basierend auf "All Tests" Runs
+      calculateEstimatedDuration(runsRes.data.data || []);
       
       setLoading(false);
     } catch (error) {

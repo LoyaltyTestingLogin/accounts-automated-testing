@@ -156,6 +156,15 @@ export class SlackNotifier {
             },
           ],
         },
+        ...(this.getTestDescription(testRun.testName) ? [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*Test-Details:*\n${this.getTestDescription(testRun.testName)}`,
+            },
+          },
+        ] : []),
         ...(testRun.errorMessage ? [
           {
             type: 'section',
@@ -259,6 +268,15 @@ export class SlackNotifier {
             },
           ],
         },
+        ...(this.getTestDescription(testRun.testName) ? [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*Test-Details:*\n${this.getTestDescription(testRun.testName)}`,
+            },
+          },
+        ] : []),
         {
           type: 'section',
           text: {
@@ -367,6 +385,26 @@ export class SlackNotifier {
         },
       ],
     };
+  }
+
+  /**
+   * Hilfsfunktion: Test-Beschreibung basierend auf Test-Namen ermitteln
+   */
+  private getTestDescription(testName: string): string | null {
+    const descriptions: Record<string, string> = {
+      'Login - Passwort Login inklusive Login Challenge': 
+        'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n• Test 2: Combined Account (TAN per E-Mail)\n• Test 3: Combined Account (TAN per SMS)',
+      'Login - OTP (Einmalcode) Login': 
+        'Vollständiger OTP Login-Flow mit Einmalcode statt Passwort\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n• Test 2: Combined Account (TAN per E-Mail)\n• Test 3: Combined Account (TAN per SMS)',
+      'Login - Passwort Reset': 
+        'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n• Test 2: Combined Account (TAN per E-Mail)\n• Test 3: Combined Account (TAN per SMS)',
+      'Registrierung - E-Mail Registrierung': 
+        'Vollständiger E-Mail-Registrierungs-Flow\n\n• E-Mail eingeben\n• Passwort wählen\n• TAN-Verifizierung per E-Mail\n• Registrierung abschließen\n• Konto automatisch löschen',
+      'Registrierung - Telefon Registrierung': 
+        'Vollständiger Telefon-Registrierungs-Flow\n\n• Telefonnummer eingeben\n• E-Mail & Passwort wählen\n• TAN-Verifizierung per E-Mail\n• TAN-Verifizierung per SMS\n• Registrierung abschließen\n• Konto automatisch löschen',
+    };
+    
+    return descriptions[testName] || null;
   }
 
   /**
