@@ -438,7 +438,7 @@ export default function Dashboard() {
               <div>
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <span className="text-2xl">⚡</span>
-                  Alle Tests (Headless)
+                  Alle Tests (ohne Browser)
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
                   Führt alle Tests im Hintergrund aus → <strong>Läuft ohne Browser-Fenster</strong>
