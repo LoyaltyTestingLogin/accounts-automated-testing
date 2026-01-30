@@ -518,9 +518,6 @@ export default function Dashboard() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Slack
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Aktionen
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -601,22 +598,6 @@ export default function Dashboard() {
                       onClick={() => router.push(`/test-runs/${run.id}`)}
                     >
                       {run.slackNotified ? '✓' : '-'}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm">
-                      {run.status === 'running' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm('Test im Browser ansehen?\n\nDer Test wird neu im headed Modus gestartet, damit du den Ablauf live verfolgen kannst.')) {
-                              runTests(run.testName);
-                            }
-                          }}
-                          className="btn-secondary text-xs px-3 py-1 whitespace-nowrap"
-                          title="Achtung - Tests werden neugestartet!"
-                        >
-                          🎬 Browser
-                        </button>
-                      )}
                     </td>
                   </tr>
                 ))}
