@@ -92,17 +92,20 @@ export class EmailClient {
 
     const startTime = Date.now();
 
-    while (Date.now() - startTime < timeoutMs) {
-      console.log(`📧 Suche E-Mail mit Filter: ${JSON.stringify(filter)}...`);
+    console.log(`📧 Suche E-Mail mit Filter: ${JSON.stringify(filter)}...`);
+    console.log(`   Suchstart: ${new Date(startTime).toISOString()}`);
 
+    while (Date.now() - startTime < timeoutMs) {
       const emails = await this.getRecentEmails(20);
 
-      // Nach Kriterien filtern
+      // Nach Kriterien filtern - NUR E-Mails die NACH Suchstart eingegangen sind
       const matchingEmail = emails.find((email) => {
         const emailReceivedTime = new Date(email.receivedDateTime).getTime();
-        const isRecent = Date.now() - emailReceivedTime < 120000; // Letzte 2 Minuten
-
-        if (!isRecent) return false;
+        
+        // WICHTIG: Nur E-Mails akzeptieren die NACH dem Suchstart kamen (mit 10s Puffer)
+        if (emailReceivedTime < startTime - 10000) {
+          return false; // Zu alt, überspringe
+        }
 
         if (filter.subject && !email.subject.toLowerCase().includes(filter.subject.toLowerCase())) {
           return false;

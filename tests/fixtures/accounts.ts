@@ -47,7 +47,7 @@ export const TEST_ACCOUNTS: Record<string, TestAccount> = {
     passwordEnvKey: 'TEST_PASSWORD_ACCOUNT_2',
     features: ['email', 'phone', 'email_phone', 'login_challenge', 'verified'],
     description: 'Account mit E-Mail und Telefon, Login Challenge (TAN per E-Mail oder SMS bei unbekanntem Gerät)',
-    phone: '+49 XXX XXXXXXXX', // TODO: Echte Nummer eintragen wenn bekannt
+    phone: '01746760225 ext. 8520',
   },
 
   // Weitere Accounts können hier einfach hinzugefügt werden:

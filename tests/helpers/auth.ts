@@ -176,16 +176,175 @@ export async function logout(page: Page) {
 }
 
 /**
+ * Wählt die Methode für Login Challenge aus (Email oder Phone)
+ * Wird nur bei Combined Accounts angezeigt (haben Email UND Phone)
+ */
+export async function selectChallengeMethod(page: Page, method: 'email' | 'phone'): Promise<void> {
+  console.log(`🔍 Prüfe auf Selection Screen für Login Challenge...`);
+  
+  await page.waitForTimeout(2000);
+  
+  // Prüfe ob Selection Screen vorhanden ist
+  const bodyText = await page.locator('body').textContent() || '';
+  const hasSelection = bodyText.toLowerCase().includes('sicherheitscode') || 
+                       bodyText.toLowerCase().includes('wie möchten') ||
+                       bodyText.toLowerCase().includes('code erhalten');
+  
+  if (!hasSelection) {
+    console.log('ℹ️  Kein Selection Screen - nur eine Methode verfügbar');
+    return;
+  }
+  
+  console.log(`✅ Selection Screen erkannt - prüfe ${method === 'email' ? 'E-Mail' : 'Telefonnummer'}-Option`);
+  
+  // SCHRITT 1: Prüfe ob die gewünschte Option bereits ausgewählt ist (Radio Button checked)
+  const radioSelectors = method === 'email'
+    ? [
+        'input[type="radio"][value*="email"]',
+        'input[type="radio"][value*="mail"]',
+      ]
+    : [
+        'input[type="radio"][value*="sms"]',
+        'input[type="radio"][value*="phone"]',
+        'input[type="radio"][value*="telefon"]',
+      ];
+  
+  let alreadySelected = false;
+  for (const radioSelector of radioSelectors) {
+    try {
+      const radioButton = page.locator(radioSelector).first();
+      if (await radioButton.count() > 0) {
+        const isChecked = await radioButton.evaluate((el: any) => el.checked);
+        if (isChecked) {
+          console.log(`✅ ${method === 'email' ? 'E-Mail' : 'SMS'}-Option ist bereits ausgewählt (checked=true)`);
+          alreadySelected = true;
+          break;
+        }
+      }
+    } catch (e) {
+      // Weiter zur nächsten Prüfung
+    }
+  }
+  
+  // WICHTIG: Auch wenn bereits ausgewählt, müssen wir trotzdem auf das Label klicken
+  // um sicherzustellen dass das UI vollständig aktualisiert wird
+  if (alreadySelected) {
+    console.log('ℹ️  Option bereits ausgewählt, aber klicke trotzdem zur Sicherheit...');
+  }
+  
+  // SCHRITT 2: Option ist nicht ausgewählt - jetzt auswählen
+  console.log(`🖱️  ${method === 'email' ? 'E-Mail' : 'SMS'}-Option wird ausgewählt...`);
+  
+  // Selektoren für die Auswahl - die SPEZIFISCHEN Labels für Combined Account Selection
+  const selectors = method === 'email' 
+    ? [
+        'label:has-text("E-Mail mit einem Code erhalten")',
+        'label:has-text("E-Mail mit")',
+        'input[type="radio"][value*="email"]',
+        'label:has-text("per E-Mail")',
+        'button:has-text("E-Mail")',
+        'a:has-text("E-Mail")',
+        '[data-testid*="email"]',
+      ]
+    : [
+        'label:has-text("SMS mit einem Code erhalten")',
+        'label:has-text("SMS mit")',
+        'input[type="radio"][value*="sms"]',
+        'input[type="radio"][value*="phone"]',
+        'label:has-text("per SMS")',
+        'button:has-text("SMS")',
+        'button:has-text("Telefon")',
+        'a:has-text("SMS")',
+        '[data-testid*="sms"]',
+        '[data-testid*="phone"]',
+      ];
+  
+  let clicked = false;
+  for (const selector of selectors) {
+    try {
+      const element = page.locator(selector).first();
+      const count = await element.count();
+      
+      if (count > 0) {
+        console.log(`🔍 ${method === 'email' ? 'E-Mail' : 'SMS'}-Option gefunden: ${selector}`);
+        
+        // STRATEGIE 1: Normaler Playwright-Click (bevorzugt)
+        try {
+          await element.click({ timeout: 3000 });
+          console.log(`✅ ${method === 'email' ? 'E-Mail' : 'SMS'}-Option geklickt (normaler Click)`);
+          clicked = true;
+          await page.waitForTimeout(1500);
+          
+          // Validiere dass der Click funktioniert hat
+          for (const radioSelector of radioSelectors) {
+            try {
+              const radioButton = page.locator(radioSelector).first();
+              if (await radioButton.count() > 0) {
+                const isChecked = await radioButton.evaluate((el: any) => el.checked);
+                if (isChecked) {
+                  console.log(`✅ Validierung: Radio-Button ist jetzt checked`);
+                  return; // Erfolgreich!
+                }
+              }
+            } catch (e) {
+              // Weiter
+            }
+          }
+          
+          console.log(`⚠️  Validierung fehlgeschlagen: Radio-Button nicht checked trotz Click`);
+          clicked = false; // Weiter versuchen
+          
+        } catch (normalClickErr) {
+          console.log(`⚠️  Normaler Click fehlgeschlagen: ${normalClickErr}`);
+          
+          // STRATEGIE 2: Click mit force: true
+          try {
+            await element.click({ force: true, timeout: 3000 });
+            console.log(`✅ ${method === 'email' ? 'E-Mail' : 'SMS'}-Option geklickt (force: true)`);
+            clicked = true;
+            await page.waitForTimeout(1500);
+            break;
+          } catch (forceClickErr) {
+            console.log(`⚠️  Force-Click fehlgeschlagen: ${forceClickErr}`);
+            
+            // STRATEGIE 3: JavaScript-Click als letzter Ausweg
+            try {
+              await element.evaluate((el: any) => el.click());
+              console.log(`✅ ${method === 'email' ? 'E-Mail' : 'SMS'}-Option geklickt (JavaScript)`);
+              clicked = true;
+              await page.waitForTimeout(1500);
+              break;
+            } catch (jsClickErr) {
+              console.log(`⚠️  JavaScript-Click fehlgeschlagen: ${jsClickErr}`);
+            }
+          }
+        }
+        
+        if (clicked) break;
+      }
+    } catch (e) {
+      // Nächsten Selektor versuchen
+      continue;
+    }
+  }
+  
+  if (!clicked) {
+    console.log(`⚠️  ${method === 'email' ? 'E-Mail' : 'SMS'}-Option konnte nicht gefunden oder angeklickt werden - möglicherweise bereits ausgewählt`);
+  }
+}
+
+/**
  * Login-Challenge Handler (Sicherheitsprüfung bei unbekanntem Gerät)
  * WICHTIG: Dies ist NICHT 2FA, sondern eine Login Challenge die bei unbekanntem Gerät/Inkognito kommt
  * Vollständiger Flow:
  * 1. Screen "Kurze Sicherheitsüberprüfung" erkennen
- * 2. Auf "Weiter" klicken → E-Mail wird versendet
- * 3. 6-stelligen TAN-Code aus E-Mail auslesen
- * 4. TAN-Code eingeben
- * 5. Wieder "Weiter" klicken
+ * 2. [Optional] Bei Combined Account: Methode auswählen (Email/Phone)
+ * 3. Auf "Weiter" klicken → E-Mail/SMS wird versendet
+ * 4. 6-stelligen TAN-Code aus E-Mail/SMS auslesen
+ * 5. TAN-Code eingeben
+ * 6. Wieder "Weiter" klicken
  */
-export async function handleLoginChallenge(page: Page): Promise<boolean> {
+export async function handleLoginChallenge(page: Page, challengeMethod?: 'email' | 'phone'): Promise<boolean> {
   console.log('🔐 Prüfe auf Login-Challenge...');
 
   // Warte auf Challenge-Seite
@@ -240,24 +399,75 @@ export async function handleLoginChallenge(page: Page): Promise<boolean> {
     return false;
   }
 
-  // SCHRITT 2: Klicke auf "Weiter" um E-Mail-Versand auszulösen
-  console.log('➡️  Suche "Weiter"-Button um TAN-Code per E-Mail anzufordern...');
+  // SCHRITT 1.5: Bei Combined Account - Methode auswählen (falls challengeMethod angegeben)
+  if (challengeMethod) {
+    await selectChallengeMethod(page, challengeMethod);
+    
+    // WICHTIG: Nach der Auswahl warten, damit das DOM aktualisiert wird
+    console.log('⏳ Warte nach Auswahl, damit UI aktualisiert wird...');
+    await page.waitForTimeout(2000);
+    
+    // VALIDIERUNG: Prüfe ob die richtige Option wirklich ausgewählt ist
+    console.log('🔍 Validiere ob die Auswahl erfolgreich war...');
+    const radioSelectors = challengeMethod === 'email'
+      ? ['input[type="radio"][value*="email"]', 'input[type="radio"][value*="mail"]']
+      : ['input[type="radio"][value*="sms"]', 'input[type="radio"][value*="phone"]', 'input[type="radio"][value*="telefon"]'];
+    
+    let selectedCorrectly = false;
+    for (const radioSelector of radioSelectors) {
+      try {
+        const radioButton = page.locator(radioSelector).first();
+        if (await radioButton.count() > 0) {
+          const isChecked = await radioButton.evaluate((el: any) => el.checked);
+          if (isChecked) {
+            console.log(`✅ VALIDIERUNG ERFOLGREICH: ${challengeMethod === 'email' ? 'E-Mail' : 'SMS'}-Option ist ausgewählt (checked=true)`);
+            selectedCorrectly = true;
+            break;
+          }
+        }
+      } catch (e) {
+        // Weiter
+      }
+    }
+    
+    if (!selectedCorrectly) {
+      console.log(`⚠️  WARNUNG: ${challengeMethod === 'email' ? 'E-Mail' : 'SMS'}-Option ist NICHT ausgewählt (checked=false)!`);
+    }
+    
+    // Screenshot vor dem Button-Click
+    await page.screenshot({ 
+      path: `test-results/screenshots/before-weiter-click-${Date.now()}.png`,
+      fullPage: true 
+    });
+    console.log('📸 Screenshot erstellt vor Button-Click');
+  }
+
+  // SCHRITT 2: Klicke auf "Weiter" oder "Code senden" um E-Mail/SMS-Versand auszulösen
+  console.log('➡️  Suche "Weiter" oder "Code senden"-Button um TAN-Code anzufordern...');
   
-  // Sehr breite Button-Selektor-Liste
-  const weiterButtonSelectors = [
-    'button:has-text("Weiter")',
-    'button:has-text("weiter")',
+  // Debug: Liste ALLE Buttons auf dem Screen
+  const allButtonsDebug = await page.locator('button, a[role="button"]').all();
+  console.log(`🔍 Alle verfügbaren Buttons auf dem Screen (${allButtonsDebug.length}):`);
+  for (let i = 0; i < Math.min(allButtonsDebug.length, 15); i++) {
+    const btnText = await allButtonsDebug[i].textContent();
+    const btnType = await allButtonsDebug[i].getAttribute('type');
+    const isVisible = await allButtonsDebug[i].isVisible();
+    console.log(`   ${i + 1}. "${btnText?.trim()}" (type: ${btnType}, visible: ${isVisible})`);
+  }
+  
+  // PRIORISIERE "Code senden"-Buttons (die sind spezifischer für TAN-Versand)
+  const submitButtonSelectors = [
+    'button:has-text("Code senden")',
+    'button:has-text("code senden")',
+    'button:has-text("Senden")',
     'button[type="submit"]:has-text("Weiter")',
-    'button[type="button"]:has-text("Weiter")',
-    'a:has-text("Weiter")',
-    'button[type="submit"]',
-    'button:visible:not([disabled])',
-    '[role="button"]:has-text("Weiter")',
+    'button:has-text("Weiter")',
+    '[role="button"]:has-text("Code senden")',
   ];
 
-  let weiterButton = null;
+  let submitButton = null;
   
-  for (const selector of weiterButtonSelectors) {
+  for (const selector of submitButtonSelectors) {
     const locator = page.locator(selector).first();
     const count = await locator.count();
     
@@ -266,8 +476,9 @@ export async function handleLoginChallenge(page: Page): Promise<boolean> {
       try {
         // Prüfe ob sichtbar
         if (await locator.isVisible({ timeout: 2000 })) {
-          weiterButton = locator;
-          console.log(`✅ Sichtbarer "Weiter"-Button gefunden: ${selector}`);
+          const buttonText = await locator.textContent();
+          submitButton = locator;
+          console.log(`✅ Sichtbarer Submit-Button gefunden: ${selector} (Text: "${buttonText?.trim()}")`);
           break;
         }
       } catch (e) {
@@ -276,22 +487,64 @@ export async function handleLoginChallenge(page: Page): Promise<boolean> {
     }
   }
   
-  if (weiterButton) {
+  // FALLBACK: Wenn kein spezifischer Button gefunden, suche sichtbaren Button mit "weiter" im Text
+  if (!submitButton) {
+    console.log('🔍 Kein spezifischer Button gefunden, suche sichtbaren "weiter"-Button...');
+    const weiterButtons = await page.locator('button[type="submit"]').all();
+    for (const btn of weiterButtons) {
+      try {
+        if (await btn.isVisible()) {
+          const buttonText = (await btn.textContent() || '').toLowerCase();
+          if (buttonText.includes('weiter')) {
+            submitButton = btn;
+            console.log(`✅ Sichtbaren "weiter"-Button gefunden (Text: "${buttonText.trim()}")`);
+            break;
+          }
+        }
+      } catch (e) {
+        // Weiter
+      }
+    }
+  }
+  
+  if (submitButton) {
+    const urlBeforeClick = page.url();
+    console.log(`📍 URL VOR Button-Click: ${urlBeforeClick}`);
+    
     try {
-      console.log('🖱️  Klicke auf "Weiter"-Button...');
-      await weiterButton.click({ force: true, timeout: 5000 });
-      console.log('✅ "Weiter" geklickt - E-Mail wird versendet');
+      console.log('🖱️  Klicke auf Submit-Button...');
+      await submitButton.click({ force: true, timeout: 5000 });
+      console.log('✅ Submit-Button geklickt');
     } catch (e) {
       console.log(`⚠️  Click fehlgeschlagen: ${e}`);
       console.log('⌨️  Versuche Enter-Taste...');
       await page.keyboard.press('Enter');
     }
+    
+    // Warte auf mögliche Navigation
+    await page.waitForTimeout(2000);
+    
+    const urlAfterClick = page.url();
+    console.log(`📍 URL NACH Button-Click: ${urlAfterClick}`);
+    
+    if (urlBeforeClick === urlAfterClick) {
+      console.log('✅ URL unverändert - vermutlich auf TAN-Eingabe-Screen geblieben');
+    } else {
+      console.log('⚠️  URL hat sich geändert!');
+    }
+    
+    // Screenshot NACH dem Click
+    await page.screenshot({ 
+      path: `test-results/screenshots/after-weiter-click-${Date.now()}.png`,
+      fullPage: true 
+    });
+    console.log('📸 Screenshot erstellt nach Button-Click');
+    
   } else {
-    console.log('⚠️  Kein "Weiter"-Button gefunden, versuche Enter...');
+    console.log('⚠️  Kein Submit-Button gefunden, versuche Enter...');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(1500);
   }
-
-  await page.waitForTimeout(1500);
 
   // Debug: Was ist nach dem Klick auf "Weiter" passiert?
   const urlAfterWeiter = page.url();
