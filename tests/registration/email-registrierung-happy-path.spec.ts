@@ -162,27 +162,27 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       console.log('🔍 SCHRITT 6: Prüfe c24session Cookie...');
       await expectLoginSuccess(page);
 
-      // SCHRITT 7: Prüfe auf Willkommensmail
-      console.log('📧 SCHRITT 7: Prüfe auf Willkommensmail...');
+      // SCHRITT 7: Starte asynchrone Prüfung auf Willkommensmail
+      console.log('📧 SCHRITT 7: Starte asynchrone Prüfung auf Willkommensmail...');
       
-      try {
-        const welcomeEmail = await emailClient.waitForEmail(
-          {
-            subject: 'Herzlich willkommen bei CHECK24!',
-          },
-          30000,
-          2000
-        );
-        
+      const welcomeEmailPromise = emailClient.waitForEmail(
+        {
+          subject: 'Herzlich willkommen bei CHECK24!',
+        },
+        30000,
+        2000
+      ).then((welcomeEmail) => {
         console.log(`✅ Willkommensmail erhalten: "${welcomeEmail.subject}"`);
-      } catch (e) {
-        console.warn('⚠️  Willkommensmail nicht innerhalb von 30 Sekunden erhalten - fahre trotzdem fort');
-      }
+        return welcomeEmail;
+      }).catch(() => {
+        console.warn('⚠️  Willkommensmail nicht innerhalb von 30 Sekunden erhalten');
+        return null;
+      });
 
       console.log(`✅ E-Mail-Registrierung vollständig erfolgreich für: ${email}`);
 
-      // SCHRITT 8: Konto wieder löschen
-      console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto...');
+      // SCHRITT 8: Konto wieder löschen (parallel zur Willkommensmail-Prüfung)
+      console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto (parallel zur Willkommensmail-Prüfung)...');
       
       // Cookie-Banner schließen (falls vorhanden)
       console.log('   Prüfe auf Cookie-Banner...');
@@ -232,6 +232,9 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       await page.waitForTimeout(2000);
 
       console.log('✅ Konto erfolgreich gelöscht');
+
+      // Warte auf Abschluss der Willkommensmail-Prüfung
+      await welcomeEmailPromise;
     } finally {
       await context.close();
     }
