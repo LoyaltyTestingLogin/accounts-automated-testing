@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { expectLoginSuccess, logout } from '../helpers/auth';
 import { getAccountCredentials } from '../fixtures/accounts';
 import { getEmailClient } from '../helpers/email';
+import { sendEmailTimeoutWarning } from '../helpers/slack';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -83,13 +84,23 @@ async function enterOtpCode(page: any) {
   const emailClient = getEmailClient();
   
   // Warte auf E-Mail mit OTP-Code
-  const otpEmail = await emailClient.waitForEmail(
-    {
-      subject: 'CHECK24', // Anpassen falls nötig
-    },
-    120000, // 2 Minuten Timeout
-    3000    // Alle 3 Sekunden prüfen
-  );
+  let otpEmail;
+  try {
+    otpEmail = await emailClient.waitForEmail(
+      {
+        subject: 'CHECK24', // Anpassen falls nötig
+      },
+      120000, // 2 Minuten Timeout
+      3000    // Alle 3 Sekunden prüfen
+    );
+  } catch (error) {
+    await sendEmailTimeoutWarning(
+      'OTP Login - OTP-Code',
+      'subject: CHECK24',
+      120
+    );
+    throw error;
+  }
 
   if (!otpEmail) {
     throw new Error('OTP-Code E-Mail nicht erhalten (Timeout nach 2 Minuten)');
@@ -450,13 +461,23 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
       console.log('📱 Warte auf weitergeleitete SMS per E-Mail vom iPhone...');
       const emailClient = getEmailClient();
       
-      const smsEmail = await emailClient.waitForEmail(
-        {
-          from: 'ulitesting@icloud.com', // iPhone-Weiterleitung
-        },
-        120000,
-        3000
-      );
+      let smsEmail;
+      try {
+        smsEmail = await emailClient.waitForEmail(
+          {
+            from: 'ulitesting@icloud.com', // iPhone-Weiterleitung
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'OTP Login SMS - TAN-Code',
+          'from: ulitesting@icloud.com',
+          120
+        );
+        throw error;
+      }
 
       if (!smsEmail) {
         throw new Error('SMS-Weiterleitungs-E-Mail vom iPhone nicht erhalten');

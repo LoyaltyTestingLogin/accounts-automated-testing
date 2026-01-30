@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { expectLoginSuccess } from '../helpers/auth';
 import { getEmailClient } from '../helpers/email';
+import { sendEmailTimeoutWarning } from '../helpers/slack';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -109,13 +110,23 @@ test.describe('CHECK24 Registrierung - Telefon Happy Path', () => {
       console.log('📧 SCHRITT 4: Warte auf E-Mail-TAN-Code...');
       const emailClient = getEmailClient();
       
-      const emailTanEmail = await emailClient.waitForEmail(
-        {
-          subject: 'CHECK24',
-        },
-        120000,
-        3000
-      );
+      let emailTanEmail;
+      try {
+        emailTanEmail = await emailClient.waitForEmail(
+          {
+            subject: 'CHECK24',
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'Phone-Registrierung - E-Mail-TAN-Verifizierung',
+          'subject: CHECK24',
+          120
+        );
+        throw error;
+      }
 
       // E-Mail-TAN-Code extrahieren
       console.log('🔍 Extrahiere E-Mail-TAN-Code...');
@@ -174,13 +185,23 @@ test.describe('CHECK24 Registrierung - Telefon Happy Path', () => {
       // SCHRITT 7: SMS-Verifizierung - TAN aus weitergeleiteter SMS-E-Mail holen
       console.log('📱 SCHRITT 7: Warte auf SMS-TAN-Code (weitergeleitet per E-Mail)...');
       
-      const smsTanEmail = await emailClient.waitForEmail(
-        {
-          from: 'ulitesting@icloud.com',
-        },
-        120000,
-        3000
-      );
+      let smsTanEmail;
+      try {
+        smsTanEmail = await emailClient.waitForEmail(
+          {
+            from: 'ulitesting@icloud.com',
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'Phone-Registrierung - SMS-TAN-Verifizierung',
+          'from: ulitesting@icloud.com',
+          120
+        );
+        throw error;
+      }
 
       // SMS-TAN-Code extrahieren
       console.log('🔍 Extrahiere SMS-TAN-Code aus weitergeleiteter SMS...');
@@ -258,8 +279,13 @@ test.describe('CHECK24 Registrierung - Telefon Happy Path', () => {
       ).then((welcomeEmail) => {
         console.log(`✅ Willkommensmail erhalten: "${welcomeEmail.subject}"`);
         return welcomeEmail;
-      }).catch(() => {
+      }).catch(async () => {
         console.warn('⚠️  Willkommensmail nicht innerhalb von 30 Sekunden erhalten');
+        await sendEmailTimeoutWarning(
+          'Phone-Registrierung - Willkommensmail',
+          'subject: Herzlich willkommen bei CHECK24!',
+          30
+        );
         return null;
       });
 

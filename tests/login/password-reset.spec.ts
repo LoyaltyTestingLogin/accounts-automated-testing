@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { expectLoginSuccess, logout } from '../helpers/auth';
 import { getAccountCredentials } from '../fixtures/accounts';
 import { getEmailClient } from '../helpers/email';
+import { sendEmailTimeoutWarning } from '../helpers/slack';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -90,13 +91,23 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // SCHRITT 4: TAN-Code aus E-Mail holen
       console.log('📧 SCHRITT 4: Warte auf TAN-Code per E-Mail...');
       
-      const email = await emailClient.waitForEmail(
-        {
-          subject: 'CHECK24',
-        },
-        120000,
-        3000
-      );
+      let email;
+      try {
+        email = await emailClient.waitForEmail(
+          {
+            subject: 'CHECK24',
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset Email-Only - TAN-Code',
+          'subject: CHECK24',
+          120
+        );
+        throw error;
+      }
 
       // TAN-Code extrahieren
       console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
@@ -260,6 +271,11 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail.subject}"`);
       } catch (e) {
         console.warn('⚠️  Bestätigungsmail nicht innerhalb von 30 Sekunden erhalten - fahre trotzdem fort');
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset Email-Only - Bestätigungsmail',
+          'subject: Ihr CHECK24 Passwort wurde geändert',
+          30
+        );
       }
 
       // SCHRITT 11: Phone Collector überspringen (nur bei Email-Only Account)
@@ -492,13 +508,23 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // SCHRITT 5: TAN-Code aus E-Mail holen
       console.log('📧 SCHRITT 5: Warte auf TAN-Code per E-Mail...');
       
-      const email = await emailClient.waitForEmail(
-        {
-          subject: 'CHECK24',
-        },
-        120000,
-        3000
-      );
+      let email;
+      try {
+        email = await emailClient.waitForEmail(
+          {
+            subject: 'CHECK24',
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset Combined Email - TAN-Code',
+          'subject: CHECK24',
+          120
+        );
+        throw error;
+      }
 
       // TAN-Code extrahieren
       console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
@@ -642,6 +668,11 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail.subject}"`);
       } catch (e) {
         console.warn('⚠️  Bestätigungsmail nicht innerhalb von 30 Sekunden erhalten - fahre trotzdem fort');
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset - Bestätigungsmail',
+          'subject: Ihr CHECK24 Passwort wurde geändert',
+          30
+        );
       }
 
       // SCHRITT 12: Warte auf Weiterleitung zum Kundenbereich (kein Phone Collector bei Combined Account)
@@ -782,13 +813,23 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log('📱 SCHRITT 5: Warte auf weitergeleitete SMS per E-Mail vom iPhone...');
       const emailClient = getEmailClient();
       
-      const smsEmail = await emailClient.waitForEmail(
-        {
-          from: 'ulitesting@icloud.com', // iPhone-Weiterleitung
-        },
-        120000,
-        3000
-      );
+      let smsEmail;
+      try {
+        smsEmail = await emailClient.waitForEmail(
+          {
+            from: 'ulitesting@icloud.com', // iPhone-Weiterleitung
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset Combined SMS - TAN-Code',
+          'from: ulitesting@icloud.com',
+          120
+        );
+        throw error;
+      }
 
       if (!smsEmail) {
         throw new Error('SMS-Weiterleitungs-E-Mail vom iPhone nicht erhalten');
@@ -914,6 +955,11 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail.subject}"`);
       } catch (e) {
         console.warn('⚠️  Bestätigungsmail nicht innerhalb von 30 Sekunden erhalten - fahre trotzdem fort');
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset - Bestätigungsmail',
+          'subject: Ihr CHECK24 Passwort wurde geändert',
+          30
+        );
       }
 
       // SCHRITT 12: Warte auf Weiterleitung zum Kundenbereich (kein Phone Collector bei Combined Account)

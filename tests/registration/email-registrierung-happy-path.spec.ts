@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { expectLoginSuccess } from '../helpers/auth';
 import { getEmailClient } from '../helpers/email';
+import { sendEmailTimeoutWarning } from '../helpers/slack';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -88,13 +89,23 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       console.log('📧 SCHRITT 3: Warte auf TAN-Code per E-Mail...');
       const emailClient = getEmailClient();
       
-      const tanEmail = await emailClient.waitForEmail(
-        {
-          subject: 'CHECK24',
-        },
-        120000,
-        3000
-      );
+      let tanEmail;
+      try {
+        tanEmail = await emailClient.waitForEmail(
+          {
+            subject: 'CHECK24',
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'E-Mail-Registrierung - TAN-Verifizierung',
+          'subject: CHECK24',
+          120
+        );
+        throw error;
+      }
 
       // TAN-Code extrahieren
       console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
@@ -174,8 +185,13 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       ).then((welcomeEmail) => {
         console.log(`✅ Willkommensmail erhalten: "${welcomeEmail.subject}"`);
         return welcomeEmail;
-      }).catch(() => {
+      }).catch(async () => {
         console.warn('⚠️  Willkommensmail nicht innerhalb von 30 Sekunden erhalten');
+        await sendEmailTimeoutWarning(
+          'E-Mail-Registrierung - Willkommensmail',
+          'subject: Herzlich willkommen bei CHECK24!',
+          30
+        );
         return null;
       });
 

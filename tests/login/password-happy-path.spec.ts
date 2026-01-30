@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { loginWithPassword, expectLoginSuccess, logout, handleLoginChallenge } from '../helpers/auth';
 import { getAccountCredentials } from '../fixtures/accounts';
+import { sendEmailTimeoutWarning } from '../helpers/slack';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -246,13 +247,23 @@ test.describe('CHECK24 Login - Happy Path', () => {
         const emailClient = getEmailClient();
         
         // Warte auf Email von iPhone-Kurzbefehl (Absender: ulitesting@icloud.com)
-        const smsEmail = await emailClient.waitForEmail(
-          {
-            from: 'ulitesting@icloud.com', // iPhone-Kurzbefehl sendet von hier
-          },
-          120000, // 2 Minuten Timeout (SMS kann etwas länger dauern)
-          3000
-        );
+        let smsEmail;
+        try {
+          smsEmail = await emailClient.waitForEmail(
+            {
+              from: 'ulitesting@icloud.com', // iPhone-Kurzbefehl sendet von hier
+            },
+            120000, // 2 Minuten Timeout (SMS kann etwas länger dauern)
+            3000
+          );
+        } catch (error) {
+          await sendEmailTimeoutWarning(
+            'Password Login SMS - TAN-Code',
+            'from: ulitesting@icloud.com',
+            120
+          );
+          throw error;
+        }
         
         if (!smsEmail) {
           throw new Error('SMS-Weiterleitungs-Email vom iPhone nicht erhalten (Timeout nach 2 Minuten)');
