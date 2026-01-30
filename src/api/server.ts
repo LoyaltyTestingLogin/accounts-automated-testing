@@ -406,8 +406,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
  * Server starten
  */
 function startServer() {
-  app.listen(PORT, () => {
-    console.log(`✅ API-Server läuft auf http://localhost:${PORT}`);
+  const HOST = process.env.API_HOST || '0.0.0.0';
+  
+  app.listen(PORT, HOST, () => {
+    console.log(`✅ API-Server läuft auf http://${HOST}:${PORT}`);
     console.log(`📊 Verfügbare Endpoints:`);
     console.log(`   GET  /api/health`);
     console.log(`   GET  /api/test-runs`);
@@ -420,6 +422,12 @@ function startServer() {
     console.log(`   POST /api/test-slack`);
     console.log(`   POST /api/scheduler/pause`);
     console.log(`   POST /api/scheduler/resume\n`);
+    
+    if (HOST === '0.0.0.0') {
+      console.log(`🌐 Server ist im Netzwerk erreichbar`);
+      console.log(`   Lokal: http://localhost:${PORT}`);
+      console.log(`   Netzwerk: http://<SERVER-IP>:${PORT}\n`);
+    }
   });
 }
 
