@@ -180,6 +180,58 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       }
 
       console.log(`✅ E-Mail-Registrierung vollständig erfolgreich für: ${email}`);
+
+      // SCHRITT 8: Konto wieder löschen
+      console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto...');
+      
+      // Cookie-Banner schließen (falls vorhanden)
+      console.log('   Prüfe auf Cookie-Banner...');
+      try {
+        const cookieBannerButton = page.getByText('geht klar', { exact: true });
+        const cookieButtonVisible = await cookieBannerButton.isVisible({ timeout: 2000 }).catch(() => false);
+        if (cookieButtonVisible) {
+          await cookieBannerButton.click();
+          await page.waitForTimeout(1000);
+          console.log('   ✅ Cookie-Banner geschlossen');
+        }
+      } catch (e) {
+        // Kein Cookie-Banner, weiter geht's
+      }
+
+      // Klick auf "Anmelden & Sicherheit"
+      console.log('   Klicke auf "Anmelden & Sicherheit"...');
+      const anmeldenSicherheitLink = page.getByRole('link', { name: 'Anmelden & Sicherheit' });
+      await anmeldenSicherheitLink.waitFor({ state: 'visible', timeout: 10000 });
+      await anmeldenSicherheitLink.click({ force: true });
+      console.log('   ✅ "Anmelden & Sicherheit" geklickt');
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
+
+      // Klick auf "Kundenkonto löschen"
+      console.log('   Klicke auf "Kundenkonto löschen"...');
+      const kundenkontoLoeschenLink = page.getByText('Kundenkonto löschen');
+      await kundenkontoLoeschenLink.waitFor({ state: 'visible', timeout: 10000 });
+      await kundenkontoLoeschenLink.click();
+      console.log('   ✅ "Kundenkonto löschen" geklickt');
+      await page.waitForTimeout(1500);
+
+      // Checkbox setzen (Name: "terms")
+      console.log('   Setze Bestätigungs-Checkbox...');
+      const checkbox = page.locator('input[name="terms"][type="checkbox"]');
+      await checkbox.waitFor({ state: 'visible', timeout: 10000 });
+      await checkbox.check();
+      console.log('   ✅ Checkbox gesetzt');
+      await page.waitForTimeout(500);
+
+      // Klick auf "entfernen" Button
+      console.log('   Klicke auf "entfernen"-Button...');
+      const entfernenButton = page.getByRole('button', { name: 'entfernen', exact: true });
+      await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
+      await entfernenButton.click();
+      console.log('   ✅ "entfernen" geklickt');
+      await page.waitForTimeout(2000);
+
+      console.log('✅ Konto erfolgreich gelöscht');
     } finally {
       await context.close();
     }
