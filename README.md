@@ -2,6 +2,8 @@
 
 Automatisiertes End-to-End-Frontend-Testing des CHECK24-Logins mit Playwright, Web-Dashboard und 24/7-Monitoring.
 
+📖 **[→ CHECK24 Login-Flow Dokumentation](docs/CHECK24-LOGIN-FLOW.md)** - Vollständige Beschreibung des Login-Systems
+
 ## 🎯 Features
 
 - ✅ **E2E-Tests mit Playwright** - Automatisierte Browser-Tests für CHECK24 Login
