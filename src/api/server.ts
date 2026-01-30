@@ -277,6 +277,18 @@ app.get('/api/test-suites', (req, res) => {
         path: 'tests/login/password-reset.spec.ts',
         description: 'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
       },
+      {
+        id: 'registration-email',
+        name: 'Registrierung - E-Mail Registrierung',
+        path: 'tests/registration/email-registrierung-happy-path.spec.ts',
+        description: 'Vollständiger E-Mail-Registrierungs-Flow\n\n• E-Mail eingeben\n\n• Passwort wählen\n\n• TAN-Verifizierung per E-Mail\n\n• Registrierung abschließen',
+      },
+      {
+        id: 'registration-phone',
+        name: 'Registrierung - Telefon Registrierung',
+        path: 'tests/registration/phone-registrierung-happy-path.spec.ts',
+        description: 'Vollständiger Telefon-Registrierungs-Flow\n\n• Telefonnummer eingeben\n\n• Passwort wählen (optional)\n\n• TAN-Verifizierung per SMS\n\n• Registrierung abschließen',
+      },
     ],
   });
 });
