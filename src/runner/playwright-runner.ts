@@ -6,6 +6,7 @@ import { join } from 'path';
 import { getDatabase, TestRunInsert } from '../database/schema';
 import { getSlackNotifier } from '../slack/notifier';
 import { EventEmitter } from 'events';
+import { getTestCountForPath } from '../config/test-suites';
 
 const execAsync = promisify(exec);
 
@@ -67,8 +68,8 @@ export class PlaywrightRunner {
       });
       console.log(`📝 Verwende existierende Run-ID: ${runId}`);
     } else {
-      // Schätze Anzahl der Tests (wird später beim Parsen aktualisiert)
-      const estimatedTests = testPath?.includes('password-happy-path') ? 1 : 1;
+      // Ermittle Anzahl der Tests basierend auf testPath (aus zentraler Konfiguration)
+      const totalTests = getTestCountForPath(testPath);
 
       runId = this.db.createTestRun({
         testName,
@@ -77,7 +78,7 @@ export class PlaywrightRunner {
         startTime: new Date().toISOString(),
         triggeredBy,
         progress: 0,
-        totalTests: estimatedTests,
+        totalTests,
         completedTests: 0,
       });
       console.log(`📝 Neue Run-ID erstellt: ${runId}`);

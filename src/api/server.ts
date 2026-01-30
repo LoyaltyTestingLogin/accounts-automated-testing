@@ -140,9 +140,12 @@ app.get('/api/statistics', (req, res) => {
 app.post('/api/run-tests', async (req, res) => {
   try {
     const { testPath, project, headed } = req.body;
+    const { getTestCountForPath } = require('../config/test-suites');
 
     // Erstelle Test-Run sofort und gebe ID zurück
     const testName = testPath || 'All Tests';
+    const totalTests = getTestCountForPath(testPath);
+    
     const runId = db.createTestRun({
       testName,
       testSuite: 'Manual',
@@ -150,7 +153,7 @@ app.post('/api/run-tests', async (req, res) => {
       startTime: new Date().toISOString(),
       triggeredBy: 'manual',
       progress: 0,
-      totalTests: 1,
+      totalTests,
       completedTests: 0,
     });
 
@@ -256,40 +259,10 @@ app.post('/api/test-slack', async (req, res) => {
  * Gibt verfügbare Test-Suites zurück
  */
 app.get('/api/test-suites', (req, res) => {
+  const { TEST_SUITES } = require('../config/test-suites');
   res.json({
     success: true,
-    data: [
-      {
-        id: 'login-happy',
-        name: 'Login - Passwort Login inklusive Login Challenge',
-        path: 'tests/login/password-happy-path.spec.ts',
-        description: 'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
-      },
-      {
-        id: 'login-otp',
-        name: 'Login - OTP (Einmalcode) Login',
-        path: 'tests/login/otp-happy-path.spec.ts',
-        description: 'Vollständiger OTP Login-Flow mit Einmalcode statt Passwort\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
-      },
-      {
-        id: 'login-password-reset',
-        name: 'Login - Passwort Reset',
-        path: 'tests/login/password-reset.spec.ts',
-        description: 'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
-      },
-      {
-        id: 'registration-email',
-        name: 'Registrierung - E-Mail Registrierung',
-        path: 'tests/registration/email-registrierung-happy-path.spec.ts',
-        description: 'Vollständiger E-Mail-Registrierungs-Flow\n\n• E-Mail eingeben\n\n• Passwort wählen\n\n• TAN-Verifizierung per E-Mail\n\n• Registrierung abschließen',
-      },
-      {
-        id: 'registration-phone',
-        name: 'Registrierung - Telefon Registrierung',
-        path: 'tests/registration/phone-registrierung-happy-path.spec.ts',
-        description: 'Vollständiger Telefon-Registrierungs-Flow\n\n• Telefonnummer eingeben\n\n• Passwort wählen (optional)\n\n• TAN-Verifizierung per SMS\n\n• Registrierung abschließen',
-      },
-    ],
+    data: TEST_SUITES,
   });
 });
 
