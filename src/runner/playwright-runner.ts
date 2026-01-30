@@ -93,7 +93,7 @@ export class PlaywrightRunner {
       testLogEmitter.emit('log', { runId, message: `📝 Führe aus: ${command}\n`, timestamp: new Date().toISOString() });
 
       // Tests mit Live-Streaming ausführen
-      await this.runTestsWithLiveOutput(command, runId);
+      await this.runTestsWithLiveOutput(command, runId, { headed });
 
       const duration = Date.now() - startTime;
 
@@ -209,14 +209,19 @@ export class PlaywrightRunner {
   /**
    * Führt Tests mit Live-Output aus
    */
-  private runTestsWithLiveOutput(command: string, runId: number): Promise<void> {
+  private runTestsWithLiveOutput(command: string, runId: number, options?: { headed?: boolean }): Promise<void> {
     return new Promise((resolve, reject) => {
       // Kommando in Teile aufteilen für spawn
       const [cmd, ...args] = command.split(' ');
       
       const childProcess = spawn(cmd, args, {
         cwd: process.cwd(),
-        env: { ...process.env, FORCE_COLOR: '0' }, // Keine Farb-Codes für saubere Logs
+        env: { 
+          ...process.env, 
+          FORCE_COLOR: '0', // Keine Farb-Codes für saubere Logs
+          // Browser rechts positionieren wenn headed mode
+          BROWSER_POSITION: options?.headed ? 'right' : undefined,
+        },
         shell: true,
       });
 

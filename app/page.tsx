@@ -51,9 +51,6 @@ export default function Dashboard() {
   const [schedulerPaused, setSchedulerPaused] = useState(false);
   const [schedulerAvailable, setSchedulerAvailable] = useState(true);
   const [togglingScheduler, setTogglingScheduler] = useState(false);
-  const [showLiveLogs, setShowLiveLogs] = useState(false);
-  const [currentRunId, setCurrentRunId] = useState<number | null>(null);
-  const [liveLogs, setLiveLogs] = useState<string[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -63,46 +60,6 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // SSE-Verbindung für Live-Logs
-  useEffect(() => {
-    if (!currentRunId) return;
-
-    const eventSource = new EventSource(`http://localhost:4000/api/test-logs/${currentRunId}/stream`);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'connected') {
-          setLiveLogs(prev => [...prev, `🔗 Verbunden mit Test-Run #${data.runId}\n`]);
-        } else if (data.type === 'complete') {
-          setLiveLogs(prev => [...prev, `\n✅ Test abgeschlossen! Schließe automatisch in 3 Sekunden...\n`]);
-          eventSource.close();
-          fetchData(); // Aktualisiere die Test-Liste
-          
-          // Automatisch schließen nach 3 Sekunden
-          setTimeout(() => {
-            setShowLiveLogs(false);
-            setCurrentRunId(null);
-            setLiveLogs([]);
-          }, 3000);
-        } else if (data.message) {
-          setLiveLogs(prev => [...prev, data.message]);
-        }
-      } catch (error) {
-        console.error('Fehler beim Parsen der SSE-Nachricht:', error);
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error('SSE Fehler:', error);
-      eventSource.close();
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [currentRunId]);
 
   const fetchData = async () => {
     try {
@@ -169,11 +126,24 @@ export default function Dashboard() {
         headed: true,
       });
 
-      // Öffne Live-Log-Modal mit der runId
+      // Öffne Live-Log in neuem Fenster (links positioniert, 1/3 Breite)
       if (response.data.runId) {
-        setCurrentRunId(response.data.runId);
-        setLiveLogs([]);
-        setShowLiveLogs(true);
+        const logUrl = `/test-runs/${response.data.runId}/live`;
+        
+        // Ermittle Bildschirmbreite und -höhe
+        const screenWidth = window.screen.width;
+        const screenHeight = window.screen.height;
+        
+        // Log-Fenster nimmt linkes Drittel
+        const logWidth = Math.floor(screenWidth / 3);
+        const logHeight = screenHeight;
+        
+        // Öffne neues Fenster mit spezifischen Koordinaten (linkes Drittel)
+        window.open(
+          logUrl,
+          'LiveTestLogs',
+          `width=${logWidth},height=${logHeight},left=0,top=0,menubar=no,toolbar=no,location=no,status=no`
+        );
       } else {
         alert('Tests gestartet! Die Ergebnisse erscheinen in Kürze.');
       }
@@ -650,91 +620,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-
-      {/* Live-Log Sidebar (Links fixiert) */}
-      {showLiveLogs && currentRunId && (
-        <>
-          {/* Semi-transparenter Overlay (nur rechts) */}
-          <div className="fixed inset-0 bg-black bg-opacity-30 z-40" />
-          
-          {/* Sidebar Links */}
-          <div className="fixed left-0 top-0 bottom-0 w-[45%] bg-white shadow-2xl z-50 flex flex-col animate-slide-in">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700">
-              <div>
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <span className="inline-block w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-                  Live Test-Logs
-                </h3>
-                <p className="text-sm text-blue-100 mt-1">Test-Run #{currentRunId}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowLiveLogs(false);
-                  setCurrentRunId(null);
-                  setLiveLogs([]);
-                }}
-                className="text-white hover:text-blue-200 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Info Banner */}
-            <div className="px-6 py-3 bg-blue-50 border-b border-blue-200">
-              <p className="text-sm text-blue-800 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                💡 Positioniere den Browser rechts neben diesem Fenster für eine Split-Screen-Ansicht
-              </p>
-            </div>
-
-            {/* Log Content */}
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-900 font-mono text-sm">
-              <div className="text-green-400 whitespace-pre-wrap">
-                {liveLogs.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-400 mx-auto mb-4"></div>
-                    <p>Warte auf Test-Output...</p>
-                    <p className="text-xs mt-2 text-gray-600">Browser-Fenster sollte sich gleich öffnen →</p>
-                  </div>
-                ) : (
-                  liveLogs.map((log, index) => (
-                    <div key={index}>{log}</div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                {liveLogs.length > 0 ? (
-                  <span className="flex items-center gap-2">
-                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    {liveLogs.length} Log-Einträge
-                  </span>
-                ) : (
-                  <span className="text-gray-400">Keine Logs</span>
-                )}
-              </div>
-              <button
-                onClick={() => {
-                  setShowLiveLogs(false);
-                  setCurrentRunId(null);
-                  setLiveLogs([]);
-                }}
-                className="btn-secondary"
-              >
-                Schließen
-              </button>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Footer */}
       <footer className="mt-8 text-center text-sm text-gray-500">

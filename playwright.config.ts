@@ -69,6 +69,18 @@ export default defineConfig({
         // Verlangsamung für bessere Sichtbarkeit (500ms zwischen Aktionen)
         // Macht Tests langsamer, aber man kann alles sehen
         slowMo: 500,
+        // Browser-Launch-Optionen
+        launchOptions: {
+          // Browser auf rechten 2/3 positionieren (für Live-Monitoring)
+          // Wird nur aktiviert wenn BROWSER_POSITION=right gesetzt ist
+          args: process.env.BROWSER_POSITION === 'right' ? [
+            // Annahme: 1920x1080 Bildschirm (oder höher)
+            // Log nimmt 1/3 (640px), Browser nimmt 2/3 (1280px)
+            '--window-size=1280,2000',   // 2/3 der Bildschirmbreite, große Höhe (wird automatisch angepasst)
+            '--window-position=640,0',   // Beginnt nach dem Log-Fenster (1/3)
+            '--disable-infobars',        // Entfernt Info-Leisten für mehr Platz
+          ] : [],
+        },
       },
     },
     
