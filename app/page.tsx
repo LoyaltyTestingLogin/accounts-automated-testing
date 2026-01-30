@@ -379,7 +379,7 @@ export default function Dashboard() {
                                       {showTestInfo === suite.id ? '▼ Details ausblenden' : '▶ Details anzeigen'}
                                     </button>
                                     {showTestInfo === suite.id && (
-                                      <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                                      <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded whitespace-pre-line">
                                         {suite.description}
                                       </div>
                                     )}

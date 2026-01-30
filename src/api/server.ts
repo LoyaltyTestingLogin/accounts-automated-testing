@@ -200,9 +200,9 @@ app.get('/api/test-suites', (req, res) => {
     data: [
       {
         id: 'login-happy',
-        name: 'Login - Erfolgreicher Login mit Login Challenge',
+        name: 'Login - Passwort Login inklusive Login Challenge',
         path: 'tests/login/password-happy-path.spec.ts',
-        description: 'Vollständiger Login-Flow mit Sicherheitsprüfung: E-Mail → Passwort → Login Challenge (TAN-Code wird automatisch aus E-Mail ausgelesen) → Erfolgreicher Zugriff auf Kundenbereich.',
+        description: 'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
       },
     ],
   });
