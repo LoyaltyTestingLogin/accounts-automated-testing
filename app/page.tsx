@@ -75,8 +75,9 @@ export default function Dashboard() {
 
   const calculateEstimatedDuration = (runs: TestRun[]) => {
     // Filtere alle "All Tests" Runs die erfolgreich waren
+    // Der testName ist "tests" wenn alle Tests ausgeführt werden
     const allTestsRuns = runs.filter(
-      run => run.testName === 'All Tests' && 
+      run => (run.testName === 'All Tests' || run.testName === 'tests') && 
              run.status === 'passed' && 
              run.duration !== null
     );
