@@ -7,13 +7,14 @@ dotenv.config();
 /**
  * Zentrale Login-Helper-Funktion für CHECK24
  * Kapselt die Login-Logik für Wiederverwendbarkeit
+ * 
+ * @param page - Playwright Page Objekt
+ * @param email - E-Mail-Adresse aus tests/fixtures/accounts.ts
+ * @param password - Passwort aus tests/fixtures/accounts.ts
  */
-export async function loginWithPassword(page: Page, email?: string, password?: string) {
-  const testEmail = email || process.env.TEST_EMAIL;
-  const testPassword = password || process.env.TEST_PASSWORD;
-
-  if (!testEmail || !testPassword) {
-    throw new Error('TEST_EMAIL und TEST_PASSWORD müssen in .env definiert sein');
+export async function loginWithPassword(page: Page, email: string, password: string) {
+  if (!email || !password) {
+    throw new Error('E-Mail und Passwort sind erforderlich. Verwende getAccountCredentials() aus tests/fixtures/accounts.ts');
   }
 
   // Zur Login-Seite navigieren (vollständige URL aus .env)
@@ -32,7 +33,7 @@ export async function loginWithPassword(page: Page, email?: string, password?: s
   
   console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
   await page.waitForTimeout(300);
-  await emailInput.fill(testEmail);
+  await emailInput.fill(email);
   await page.waitForTimeout(500);
 
   // Klick auf "Weiter"-Button
@@ -53,7 +54,7 @@ export async function loginWithPassword(page: Page, email?: string, password?: s
   
   console.log('🔐 SCHRITT 2: Gebe Passwort ein...');
   await page.waitForTimeout(200);
-  await passwordInput.fill(testPassword, { force: true });
+  await passwordInput.fill(password, { force: true });
   
   // Direkt Enter drücken nach Passwort-Eingabe (schnellster Weg)
   console.log('⏎  Drücke Enter zum Anmelden...');
@@ -65,7 +66,7 @@ export async function loginWithPassword(page: Page, email?: string, password?: s
   // Warten auf Navigation nach Login
   await page.waitForLoadState('networkidle', { timeout: 30000 });
 
-  return { email: testEmail };
+  return { email };
 }
 
 /**
