@@ -278,6 +278,33 @@ export class TestDatabase {
   }
 
   /**
+   * Prüft, ob gerade manuelle Tests laufen
+   */
+  hasRunningManualTests(): boolean {
+    const stmt = this.db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM test_runs 
+      WHERE status IN ('pending', 'running') 
+        AND triggeredBy = 'manual'
+    `);
+    const result = stmt.get() as { count: number };
+    return result.count > 0;
+  }
+
+  /**
+   * Prüft, ob irgendwelche Tests laufen
+   */
+  hasRunningTests(): boolean {
+    const stmt = this.db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM test_runs 
+      WHERE status IN ('pending', 'running')
+    `);
+    const result = stmt.get() as { count: number };
+    return result.count > 0;
+  }
+
+  /**
    * Datenbank schließen
    */
   close() {

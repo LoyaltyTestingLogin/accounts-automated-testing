@@ -115,6 +115,13 @@ export class TestScheduler {
       return;
     }
 
+    // Prüfe, ob gerade manuelle Tests laufen
+    const hasManualTests = this.db.hasRunningManualTests();
+    if (hasManualTests) {
+      console.log('👤 Manuelle Tests laufen gerade, überspringe automatischen Test-Durchlauf');
+      return;
+    }
+
     if (this.isRunning) {
       console.log('⏭️  Test läuft bereits, überspringe diesen Durchlauf');
       return;
