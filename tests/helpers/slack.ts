@@ -36,10 +36,11 @@ export async function sendEmailTimeoutWarning(
   emailFilter: string,
   timeoutSeconds: number
 ): Promise<void> {
-  const message = `E-Mail-Timeout in Test "${testName}"\n` +
-    `Filter: ${emailFilter}\n` +
-    `Timeout: ${timeoutSeconds}s\n` +
-    `Timestamp: ${new Date().toISOString()}`;
+  const message = `🚨 *E-MAIL NICHT ANGEKOMMEN* - Timeout nach ${timeoutSeconds}s\n\n` +
+    `*Test:* ${testName}\n` +
+    `*Erwartete E-Mail:* ${emailFilter}\n` +
+    `*Problem:* E-Mail ist nicht innerhalb von ${timeoutSeconds} Sekunden angekommen\n` +
+    `*Zeit:* ${new Date().toISOString()}`;
   
   await sendSlackWarning(message);
 }
