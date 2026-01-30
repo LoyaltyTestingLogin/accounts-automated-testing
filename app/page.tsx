@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [schedulerPaused, setSchedulerPaused] = useState(false);
   const [schedulerAvailable, setSchedulerAvailable] = useState(true);
   const [togglingScheduler, setTogglingScheduler] = useState(false);
+  const [estimatedTotalDuration, setEstimatedTotalDuration] = useState<number | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -60,6 +61,47 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+
+  const formatEstimatedDuration = (ms: number): string => {
+    const totalSeconds = Math.round(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (minutes > 0) {
+      return `~${minutes} Min ${seconds} Sek`;
+    }
+    return `~${seconds} Sek`;
+  };
+
+  const calculateEstimatedDuration = (runs: TestRun[], suites: TestSuite[]) => {
+    // Berechne durchschnittliche Dauer pro Test-Suite basierend auf erfolgreichen Runs
+    const suiteAverages = new Map<string, number>();
+    
+    suites.forEach(suite => {
+      const suiteName = suite.name;
+      const suiteRuns = runs.filter(
+        run => run.testSuite === suiteName && 
+               run.status === 'passed' && 
+               run.duration !== null
+      );
+      
+      if (suiteRuns.length > 0) {
+        const avgDuration = suiteRuns.reduce((sum, run) => sum + (run.duration || 0), 0) / suiteRuns.length;
+        suiteAverages.set(suiteName, avgDuration);
+      } else {
+        // Fallback: 30 Sekunden wenn keine Historie vorhanden
+        suiteAverages.set(suiteName, 30000);
+      }
+    });
+    
+    // Summiere alle durchschnittlichen Dauern (sequenzielle Ausführung)
+    if (suiteAverages.size > 0) {
+      const totalDuration = Array.from(suiteAverages.values()).reduce((sum, dur) => sum + dur, 0);
+      setEstimatedTotalDuration(totalDuration);
+    } else {
+      setEstimatedTotalDuration(null);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -79,6 +121,9 @@ export default function Dashboard() {
         setSchedulerAvailable(schedulerRes.data.data.available);
         setSchedulerPaused(schedulerRes.data.data.isPaused || false);
       }
+      
+      // Berechne geschätzte Gesamtdauer aller Tests (sequenziell)
+      calculateEstimatedDuration(runsRes.data.data || [], suitesRes.data.data || []);
       
       setLoading(false);
     } catch (error) {
@@ -446,7 +491,7 @@ export default function Dashboard() {
                   Alle Tests (ohne Browser)
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  Führt alle Tests im Hintergrund aus → <strong>Läuft ohne Browser-Fenster</strong>
+                  Führt alle {testSuites.length} Tests <strong>sequenziell nacheinander</strong> aus → Optional im Browser-Fenster zusehen
                 </p>
               </div>
             </div>
@@ -456,6 +501,11 @@ export default function Dashboard() {
               <div className="text-center py-6">
                 <div className="text-3xl font-bold text-purple-600">{testSuites.length}</div>
                 <div className="text-sm text-gray-600">Tests verfügbar</div>
+                {estimatedTotalDuration !== null && (
+                  <div className="mt-3 text-sm text-gray-600">
+                    <span className="font-medium">Geschätzte Dauer:</span> {formatEstimatedDuration(estimatedTotalDuration)}
+                  </div>
+                )}
               </div>
 
               {/* Button */}
