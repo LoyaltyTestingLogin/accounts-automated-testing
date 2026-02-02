@@ -101,6 +101,18 @@ export class PlaywrightRunner {
       // Ergebnisse parsen
       const results = await this.parseTestResults(runId, testName, testSuite, duration, triggeredBy);
 
+      // Prüfe ob Test bereits abgebrochen wurde
+      const currentTestRun = this.db.getTestRun(runId);
+      
+      if (currentTestRun?.status === 'cancelled') {
+        // Test wurde abgebrochen - Status nicht überschreiben, nur Duration aktualisieren
+        console.log(`⚠️  Test ${runId} wurde abgebrochen - behalte Status 'cancelled'`);
+        this.db.updateTestRun(runId, {
+          duration,
+        });
+        return results;
+      }
+      
       // DB aktualisieren
       const allPassed = results.every(r => r.success);
       const hasTimeout = results.some(r => {
@@ -151,6 +163,26 @@ export class PlaywrightRunner {
 
       console.error('❌ Test-Ausführung fehlgeschlagen:', errorMessage);
 
+      // Prüfe ob Test bereits abgebrochen wurde
+      const currentTestRun = this.db.getTestRun(runId);
+      
+      if (currentTestRun?.status === 'cancelled') {
+        // Test wurde abgebrochen - Status nicht überschreiben
+        console.log(`⚠️  Test ${runId} wurde abgebrochen - behalte Status 'cancelled' im Error-Handler`);
+        this.db.updateTestRun(runId, {
+          duration,
+        });
+        return [{
+          runId,
+          success: false,
+          testName,
+          testSuite,
+          duration,
+          errorMessage: 'Test wurde manuell gestoppt',
+          artifacts: { screenshots: [], videos: [], traces: [] },
+        }];
+      }
+      
       // Versuche trotzdem, die Test-Ergebnisse zu parsen, um echte Fehler zu bekommen
       try {
         const results = await this.parseTestResults(runId, testName, testSuite, duration, triggeredBy);
@@ -226,6 +258,13 @@ export class PlaywrightRunner {
         shell: true,
       });
 
+      // Speichere PID in Datenbank für späteren Stop
+      const pid = childProcess.pid;
+      if (pid) {
+        this.db.updateTestRun(runId, { processPid: pid });
+        console.log(`✅ Prozess-PID ${pid} für Run-ID ${runId} in DB gespeichert`);
+      }
+
       // Tracking für Live-Progress
       let completedTestsCount = 0;
       const testRun = this.db.getTestRun(runId);
@@ -298,6 +337,10 @@ export class PlaywrightRunner {
 
       // Prozess-Ende
       childProcess.on('close', (code) => {
+        // Lösche PID aus Datenbank
+        this.db.updateTestRun(runId, { processPid: null });
+        console.log(`🗑️  Prozess-PID für Run-ID ${runId} aus DB entfernt`);
+        
         const message = `\n✅ Test-Prozess beendet mit Code ${code}\n`;
         console.log(message);
         testLogEmitter.emit('log', {
@@ -580,6 +623,79 @@ export class PlaywrightRunner {
       }
     }
   }
+  /**
+   * Stoppt einen laufenden Test
+   */
+  async stopTest(runId: number): Promise<boolean> {
+    console.log(`🛑 stopTest() aufgerufen für Run-ID ${runId}`);
+    
+    // Hole Test-Info aus Datenbank
+    const testRun = this.db.getTestRun(runId);
+    
+    if (!testRun) {
+      console.log(`⚠️  Test-Run ${runId} nicht in DB gefunden`);
+      return false;
+    }
+    
+    console.log(`📝 Test-Status: ${testRun.status}, PID: ${testRun.processPid || 'keine'}`);
+    
+    if (!testRun.processPid) {
+      console.log(`⚠️  Keine Prozess-PID für Run-ID ${runId} gefunden`);
+      return false;
+    }
+    
+    console.log(`🛑 Stoppe Test mit Run-ID ${runId} (PID: ${testRun.processPid})...`);
+    
+    try {
+      // Prüfe ob Prozess existiert
+      try {
+        process.kill(testRun.processPid, 0); // Signal 0 prüft nur Existenz
+      } catch (e) {
+        console.log(`⚠️  Prozess ${testRun.processPid} existiert nicht mehr`);
+        this.db.updateTestRun(runId, { processPid: null });
+        return false;
+      }
+      
+      // Sende SIGTERM zum sauberen Beenden (schließt auch alle Browser)
+      process.kill(testRun.processPid, 'SIGTERM');
+      console.log(`📤 SIGTERM gesendet an PID ${testRun.processPid}`);
+      
+      // Falls nach 5 Sekunden noch nicht beendet, forciere SIGKILL
+      setTimeout(() => {
+        try {
+          process.kill(testRun.processPid!, 0); // Prüfe ob noch läuft
+          console.log(`⚠️  Prozess ${testRun.processPid} reagiert nicht, sende SIGKILL...`);
+          process.kill(testRun.processPid!, 'SIGKILL');
+        } catch (e) {
+          // Prozess ist bereits beendet
+          console.log(`✅ Prozess ${testRun.processPid} bereits beendet`);
+        }
+      }, 5000);
+      
+      // Aktualisiere Status in Datenbank
+      this.db.updateTestRun(runId, {
+        status: 'cancelled',
+        endTime: new Date().toISOString(),
+        errorMessage: 'Test wurde manuell gestoppt',
+        processPid: null,
+      });
+      
+      // Event für Live-Logs
+      testLogEmitter.emit('log', {
+        runId,
+        message: '\n🛑 Test wurde manuell gestoppt\n',
+        timestamp: new Date().toISOString(),
+        type: 'system',
+      });
+      testLogEmitter.emit('complete', { runId });
+      
+      console.log(`✅ Test ${runId} erfolgreich gestoppt`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Fehler beim Stoppen von Test ${runId}:`, error);
+      return false;
+    }
+  }
 }
 
 // Singleton-Instanz
@@ -588,6 +704,7 @@ let runnerInstance: PlaywrightRunner | null = null;
 export function getPlaywrightRunner(): PlaywrightRunner {
   if (!runnerInstance) {
     runnerInstance = new PlaywrightRunner();
+    console.log('🆕 Neue PlaywrightRunner-Instanz erstellt');
   }
   return runnerInstance;
 }

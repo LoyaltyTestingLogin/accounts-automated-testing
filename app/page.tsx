@@ -10,7 +10,7 @@ interface TestRun {
   id: number;
   testName: string;
   testSuite: string;
-  status: 'pending' | 'running' | 'passed' | 'failed';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout' | 'cancelled';
   startTime: string;
   endTime: string | null;
   duration: number | null;
@@ -52,6 +52,8 @@ export default function Dashboard() {
   const [schedulerAvailable, setSchedulerAvailable] = useState(true);
   const [togglingScheduler, setTogglingScheduler] = useState(false);
   const [estimatedTotalDuration, setEstimatedTotalDuration] = useState<number | null>(null);
+  const [schedulerInterval, setSchedulerInterval] = useState(15);
+  const [changingInterval, setChangingInterval] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -95,11 +97,12 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [runsRes, statsRes, suitesRes, schedulerRes] = await Promise.all([
+      const [runsRes, statsRes, suitesRes, schedulerRes, intervalRes] = await Promise.all([
         axios.get('/api/test-runs?limit=20'),
         axios.get('/api/statistics'),
         axios.get('/api/test-suites'),
         axios.get('/api/scheduler/status').catch(() => ({ data: { data: { available: false, isPaused: false } } })),
+        axios.get('/api/scheduler/interval').catch(() => ({ data: { data: { intervalMinutes: 15 } } })),
       ]);
 
       setTestRuns(runsRes.data.data || []);
@@ -110,6 +113,11 @@ export default function Dashboard() {
       if (schedulerRes.data?.data) {
         setSchedulerAvailable(schedulerRes.data.data.available);
         setSchedulerPaused(schedulerRes.data.data.isPaused || false);
+      }
+      
+      // Scheduler Intervall
+      if (intervalRes.data?.data) {
+        setSchedulerInterval(intervalRes.data.data.intervalMinutes || 15);
       }
       
       // Berechne geschätzte Gesamtdauer basierend auf "All Tests" Runs
@@ -140,6 +148,39 @@ export default function Dashboard() {
       alert('Fehler beim Ändern des Scheduler-Status');
     } finally {
       setTogglingScheduler(false);
+    }
+  };
+
+  const changeInterval = async (newInterval: number) => {
+    if (changingInterval || !schedulerAvailable) return;
+
+    setChangingInterval(true);
+    
+    try {
+      const response = await axios.post('/api/scheduler/interval', {
+        intervalMinutes: newInterval,
+      });
+      
+      if (response.data.success) {
+        setSchedulerInterval(newInterval);
+        alert(`⏱️ Intervall geändert auf ${formatInterval(newInterval)}`);
+      }
+    } catch (error: any) {
+      console.error('Fehler beim Ändern des Intervalls:', error);
+      alert(error.response?.data?.error || 'Fehler beim Ändern des Intervalls');
+    } finally {
+      setChangingInterval(false);
+    }
+  };
+
+  const formatInterval = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${minutes} Min`;
+    } else if (minutes < 1440) {
+      const hours = minutes / 60;
+      return hours % 1 === 0 ? `${hours} Std` : `${hours} Std`;
+    } else {
+      return '24 Std';
     }
   };
 
@@ -205,6 +246,8 @@ export default function Dashboard() {
         return <span className="badge-info">⟳ Läuft</span>;
       case 'pending':
         return <span className="badge-warning">⋯ Wartend</span>;
+      case 'cancelled':
+        return <span className="badge-warning" style={{ backgroundColor: '#6b7280', color: 'white' }}>🛑 Abgebrochen</span>;
     }
   };
 
@@ -248,58 +291,87 @@ export default function Dashboard() {
           </p>
         </div>
         
-        {/* Scheduler Pause/Resume Button */}
+        {/* Scheduler Controls */}
         {schedulerAvailable && (
-          <div className="relative group">
-            <button
-              onClick={toggleScheduler}
-              disabled={togglingScheduler}
-              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 flex items-center gap-2 ${
-                schedulerPaused 
-                  ? 'bg-green-600 hover:bg-green-700' 
-                  : 'bg-red-600 hover:bg-red-700'
-              } ${togglingScheduler ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
-            >
-              {togglingScheduler ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Wird geändert...</span>
-                </>
-              ) : schedulerPaused ? (
-                <>
-                  <span>▶️</span>
-                  <span>Tests fortsetzen</span>
-                </>
-              ) : (
-                <>
-                  <span>⏸️</span>
-                  <span>Tests pausieren</span>
-                </>
-              )}
-            </button>
-            
-            {/* Custom Tooltip */}
-            <div className="absolute right-0 top-full mt-2 w-80 bg-gray-900 text-white text-sm rounded-lg p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-              <div className="font-bold mb-2">
-                {schedulerPaused ? '▶️ Tests fortsetzen' : '⏸️ Automatische Tests pausieren'}
-              </div>
-              <div className="text-gray-300 space-y-1">
-                {schedulerPaused ? (
+          <div className="flex items-center gap-3">
+            {/* Intervall Dropdown */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-600 font-medium">Test-Intervall</label>
+              <select
+                value={schedulerInterval}
+                onChange={(e) => changeInterval(parseInt(e.target.value))}
+                disabled={changingInterval}
+                className={`px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-sm font-medium text-gray-700 hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  changingInterval ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                }`}
+              >
+                <option value={30}>Alle 30 Min</option>
+                <option value={45}>Alle 45 Min</option>
+                <option value={60}>Alle 60 Min</option>
+                <option value={90}>Alle 90 Min</option>
+                <option value={120}>Alle 2 Std</option>
+                <option value={180}>Alle 3 Std</option>
+                <option value={240}>Alle 4 Std</option>
+                <option value={360}>Alle 6 Std</option>
+                <option value={480}>Alle 8 Std</option>
+                <option value={720}>Alle 12 Std</option>
+                <option value={1440}>Alle 24 Std</option>
+              </select>
+            </div>
+
+            {/* Pause/Resume Button */}
+            <div className="relative group flex flex-col gap-1">
+              <label className="text-xs text-gray-600 font-medium">Status</label>
+              <button
+                onClick={toggleScheduler}
+                disabled={togglingScheduler}
+                className={`px-6 py-2.5 rounded-lg font-semibold text-white transition-all duration-200 flex items-center gap-2 ${
+                  schedulerPaused 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-red-600 hover:bg-red-700'
+                } ${togglingScheduler ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
+              >
+                {togglingScheduler ? (
                   <>
-                    <p>• Automatische Tests laufen wieder alle <strong>15 Minuten</strong></p>
-                    <p>• 24/7 Monitoring wird fortgesetzt</p>
-                    <p>• Manuelle Tests waren weiterhin möglich</p>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Ändern...</span>
+                  </>
+                ) : schedulerPaused ? (
+                  <>
+                    <span>▶️</span>
+                    <span>Fortsetzen</span>
                   </>
                 ) : (
                   <>
-                    <p>• Stoppt die automatischen Test-Durchläufe</p>
-                    <p>• Läuft normalerweise alle <strong>15 Minuten</strong></p>
-                    <p>• Manuelle Tests bleiben weiterhin möglich</p>
+                    <span>⏸️</span>
+                    <span>Pausieren</span>
                   </>
                 )}
+              </button>
+              
+              {/* Custom Tooltip */}
+              <div className="absolute right-0 top-full mt-2 w-80 bg-gray-900 text-white text-sm rounded-lg p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                <div className="font-bold mb-2">
+                  {schedulerPaused ? '▶️ Tests fortsetzen' : '⏸️ Automatische Tests pausieren'}
+                </div>
+                <div className="text-gray-300 space-y-1">
+                  {schedulerPaused ? (
+                    <>
+                      <p>• Automatische Tests laufen wieder alle <strong>{formatInterval(schedulerInterval)}</strong></p>
+                      <p>• 24/7 Monitoring wird fortgesetzt</p>
+                      <p>• Manuelle Tests waren weiterhin möglich</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>• Stoppt die automatischen Test-Durchläufe</p>
+                      <p>• Läuft normalerweise alle <strong>{formatInterval(schedulerInterval)}</strong></p>
+                      <p>• Manuelle Tests bleiben weiterhin möglich</p>
+                    </>
+                  )}
+                </div>
+                {/* Arrow */}
+                <div className="absolute -top-2 right-8 w-4 h-4 bg-gray-900 transform rotate-45"></div>
               </div>
-              {/* Arrow */}
-              <div className="absolute -top-2 right-8 w-4 h-4 bg-gray-900 transform rotate-45"></div>
             </div>
           </div>
         )}
@@ -651,7 +723,7 @@ export default function Dashboard() {
       <footer className="mt-8 text-center text-sm text-gray-500">
         <p>
           <span className="font-semibold text-gray-700">Testimate</span> • CHECK24 Login Testing System • 
-          Automatische Tests alle {process.env.TEST_INTERVAL_MINUTES || '15'} Minuten
+          Automatische Tests alle {formatInterval(schedulerInterval)}
         </p>
       </footer>
     </div>

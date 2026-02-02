@@ -45,7 +45,7 @@ app.get('/api/test-runs', (req, res) => {
 
     let testRuns;
     
-    if (status && ['pending', 'running', 'passed', 'failed'].includes(status)) {
+    if (status && ['pending', 'running', 'passed', 'failed', 'timeout', 'cancelled'].includes(status)) {
       testRuns = db.getTestRunsByStatus(status as any, limit);
     } else {
       testRuns = db.getRecentTestRuns(limit);
@@ -273,6 +273,7 @@ app.get('/api/test-suites', (req, res) => {
 app.get('/api/scheduler/status', (req, res) => {
   try {
     const isPaused = db.isSchedulerPaused();
+    const intervalMinutes = db.getSchedulerInterval();
     
     res.json({
       success: true,
@@ -280,7 +281,8 @@ app.get('/api/scheduler/status', (req, res) => {
         available: true,
         isPaused: isPaused,
         isRunning: false, // Kann nur der Worker wissen
-        cronExpression: process.env.TEST_INTERVAL_MINUTES || '15',
+        intervalMinutes: intervalMinutes,
+        cronExpression: `*/${intervalMinutes} * * * *`,
       },
     });
   } catch (error: any) {
@@ -365,6 +367,128 @@ app.post('/api/scheduler/resume', (req, res) => {
 });
 
 /**
+ * GET /api/scheduler/interval
+ * Gibt das aktuelle Test-Intervall zurück (in Minuten)
+ */
+app.get('/api/scheduler/interval', (req, res) => {
+  try {
+    const intervalMinutes = db.getSchedulerInterval();
+    
+    res.json({
+      success: true,
+      data: {
+        intervalMinutes,
+      },
+    });
+  } catch (error: any) {
+    console.error('Fehler beim Abrufen des Scheduler-Intervalls:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/scheduler/interval
+ * Ändert das Test-Intervall (in Minuten)
+ */
+app.post('/api/scheduler/interval', async (req, res) => {
+  try {
+    const { intervalMinutes } = req.body;
+    
+    // Validierung
+    if (typeof intervalMinutes !== 'number' || intervalMinutes < 30 || intervalMinutes > 1440) {
+      return res.status(400).json({
+        success: false,
+        error: 'Intervall muss zwischen 30 und 1440 Minuten liegen',
+      });
+    }
+    
+    // Prüfe ob Intervall durch 15 teilbar ist
+    if (intervalMinutes % 15 !== 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Intervall muss durch 15 teilbar sein',
+      });
+    }
+    
+    // Speichere neues Intervall
+    db.setSchedulerInterval(intervalMinutes);
+    
+    // Benachrichtige Worker über Intervall-Änderung
+    const { notifyIntervalChange } = require('../worker/index');
+    if (notifyIntervalChange) {
+      await notifyIntervalChange(intervalMinutes);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Scheduler-Intervall aktualisiert',
+      data: {
+        intervalMinutes,
+      },
+    });
+  } catch (error: any) {
+    console.error('Fehler beim Ändern des Scheduler-Intervalls:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/test-runs/:id/stop
+ * Stoppt einen laufenden Test
+ */
+app.post('/api/test-runs/:id/stop', async (req, res) => {
+  try {
+    const runId = parseInt(req.params.id);
+    
+    // Prüfe ob Test läuft
+    const testRun = db.getTestRun(runId);
+    if (!testRun) {
+      return res.status(404).json({
+        success: false,
+        error: 'Test-Run nicht gefunden',
+      });
+    }
+    
+    if (testRun.status !== 'running' && testRun.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: 'Test läuft nicht mehr',
+      });
+    }
+    
+    // Stoppe Test
+    const stopped = await runner.stopTest(runId);
+    
+    if (stopped) {
+      res.json({
+        success: true,
+        message: 'Test wurde gestoppt',
+        data: {
+          runId,
+        },
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Test konnte nicht gestoppt werden',
+      });
+    }
+  } catch (error: any) {
+    console.error('Fehler beim Stoppen des Tests:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * Error Handler
  */
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -389,10 +513,13 @@ function startServer() {
     console.log(`   GET  /api/test-suites`);
     console.log(`   GET  /api/test-logs/:runId/stream (SSE)`);
     console.log(`   GET  /api/scheduler/status`);
+    console.log(`   GET  /api/scheduler/interval`);
     console.log(`   POST /api/run-tests`);
     console.log(`   POST /api/test-slack`);
     console.log(`   POST /api/scheduler/pause`);
-    console.log(`   POST /api/scheduler/resume\n`);
+    console.log(`   POST /api/scheduler/resume`);
+    console.log(`   POST /api/scheduler/interval`);
+    console.log(`   POST /api/test-runs/:id/stop\n`);
   });
 }
 

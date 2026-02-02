@@ -8,7 +8,7 @@ interface TestRun {
   id: number;
   testName: string;
   testSuite: string;
-  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout' | 'cancelled';
   startTime: string;
   endTime: string | null;
   duration: number | null;
@@ -36,10 +36,20 @@ export default function TestRunDetailsPage() {
   const [details, setDetails] = useState<TestRunDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
 
   useEffect(() => {
     fetchDetails();
-  }, [params.id]);
+    
+    // Auto-Refresh wenn Test läuft
+    const interval = setInterval(() => {
+      if (details?.mainRun.status === 'running' || details?.mainRun.status === 'pending') {
+        fetchDetails();
+      }
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [params.id, details?.mainRun.status]);
 
   const fetchDetails = async () => {
     try {
@@ -51,6 +61,34 @@ export default function TestRunDetailsPage() {
       setError(err.response?.data?.error || 'Fehler beim Laden der Details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const stopTest = async () => {
+    if (!details || stopping) return;
+    
+    const confirmed = window.confirm(
+      '⚠️ Test wirklich abbrechen?\n\n' +
+      'Der Test wird sofort gestoppt und alle geöffneten Browser-Fenster werden geschlossen.\n\n' +
+      'Automatische Tests laufen im nächsten Intervall normal weiter.'
+    );
+    
+    if (!confirmed) return;
+    
+    setStopping(true);
+    
+    try {
+      const res = await axios.post(`/api/test-runs/${params.id}/stop`);
+      
+      if (res.data.success) {
+        alert('✅ Test wurde gestoppt');
+        await fetchDetails(); // Aktualisiere Details
+      }
+    } catch (err: any) {
+      console.error('Fehler beim Stoppen:', err);
+      alert(err.response?.data?.error || 'Fehler beim Stoppen des Tests');
+    } finally {
+      setStopping(false);
     }
   };
 
@@ -83,6 +121,7 @@ export default function TestRunDetailsPage() {
   const failedTests = batchRuns.filter(r => r.status === 'failed');
   const passedTests = batchRuns.filter(r => r.status === 'passed');
   const timeoutTests = batchRuns.filter(r => r.status === 'timeout');
+  const cancelledTests = batchRuns.filter(r => r.status === 'cancelled');
   
   // Falls nur der Main-Run existiert (keine einzelnen Tests), zeige diesen an
   const hasIndividualTests = batchRuns.length > 1 || (batchRuns.length === 1 && batchRuns[0].id !== mainRun.id);
@@ -98,14 +137,43 @@ export default function TestRunDetailsPage() {
           >
             ← Zurück zur Übersicht
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Test-Run Details
-          </h1>
-          <p className="text-gray-600 mt-2">
-            {new Date(mainRun.startTime).toLocaleString('de-DE')}
-            {' · '}
-            {mainRun.triggeredBy === 'manual' ? '👤 Manuell' : '⏰ Automatisch'}
-          </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Test-Run Details
+              </h1>
+              <p className="text-gray-600 mt-2">
+                {new Date(mainRun.startTime).toLocaleString('de-DE')}
+                {' · '}
+                {mainRun.triggeredBy === 'manual' ? '👤 Manuell' : '⏰ Automatisch'}
+              </p>
+            </div>
+            
+            {/* Stop Button (nur wenn Test läuft) */}
+            {(mainRun.status === 'running' || mainRun.status === 'pending') && (
+              <button
+                onClick={stopTest}
+                disabled={stopping}
+                className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 flex items-center gap-2 ${
+                  stopping 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-red-600 hover:bg-red-700 hover:shadow-lg'
+                }`}
+              >
+                {stopping ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Wird gestoppt...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🛑</span>
+                    <span>Test stoppen</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -134,6 +202,28 @@ export default function TestRunDetailsPage() {
           </div>
         </div>
 
+        {/* Cancelled message (wenn Main-Run abgebrochen) */}
+        {!hasIndividualTests && mainRun.status === 'cancelled' && (
+          <div className="card mb-6">
+            <h2 className="text-xl font-bold text-gray-600 mb-4 flex items-center gap-2">
+              🛑 Test wurde abgebrochen
+            </h2>
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <h3 className="font-semibold text-gray-900 mb-3">
+                Test-Suite: {mainRun.testName}
+              </h3>
+              <p className="text-gray-600">
+                Der Test wurde manuell gestoppt und zählt nicht in die Erfolgsquote.
+              </p>
+              {mainRun.errorMessage && (
+                <div className="mt-3 text-sm text-gray-600">
+                  <strong>Hinweis:</strong> {mainRun.errorMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Command Error (wenn kein individueller Test) */}
         {!hasIndividualTests && mainRun.status === 'failed' && mainRun.errorMessage && (
           <div className="card mb-6">
@@ -152,6 +242,52 @@ export default function TestRunDetailsPage() {
                 💡 <strong>Hinweis:</strong> Der Playwright-Command konnte nicht erfolgreich ausgeführt werden. 
                 Möglicherweise wurde ein ungültiger Test-Pfad angegeben oder es gibt Syntax-Fehler im Test-Code.
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cancelled Tests */}
+        {hasIndividualTests && cancelledTests.length > 0 && (
+          <div className="card mb-6">
+            <h2 className="text-xl font-bold text-gray-600 mb-4 flex items-center gap-2">
+              🛑 Abgebrochene Tests ({cancelledTests.length})
+            </h2>
+            <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded">
+              <p className="text-sm text-gray-600">
+                ℹ️ <strong>Hinweis:</strong> Diese Tests wurden manuell gestoppt und zählen nicht in die Erfolgsquote.
+              </p>
+            </div>
+            <div className="space-y-4">
+              {cancelledTests.map((test) => (
+                <div key={test.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{test.testName}</h3>
+                      <p className="text-sm text-gray-600">{test.testSuite}</p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-500 text-white">
+                      Abgebrochen
+                    </span>
+                  </div>
+                  
+                  {test.errorMessage && (
+                    <div className="mt-3">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Details:</div>
+                      <pre className="bg-gray-900 text-gray-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                        {test.errorMessage}
+                      </pre>
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex gap-2 text-sm">
+                    {test.duration && (
+                      <span className="text-gray-600">
+                        ⏱ {(test.duration / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

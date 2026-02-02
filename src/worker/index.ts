@@ -16,6 +16,7 @@ export class TestScheduler {
   private isRunning = false;
   private cronJob: cron.ScheduledTask | null = null;
   private isPaused = false;
+  private currentIntervalMinutes = 15;
 
   constructor() {
     console.log('🤖 Test-Scheduler initialisiert');
@@ -63,7 +64,8 @@ export class TestScheduler {
     return {
       isPaused: isPaused,
       isRunning: this.isRunning,
-      cronExpression: this.cronJob ? process.env.TEST_INTERVAL_MINUTES || '15' : null,
+      intervalMinutes: this.currentIntervalMinutes,
+      cronExpression: this.cronJob ? this.getCronExpression(this.currentIntervalMinutes) : null,
     };
   }
 
@@ -71,7 +73,16 @@ export class TestScheduler {
    * Startet den Scheduler
    */
   start() {
-    const intervalMinutes = parseInt(process.env.TEST_INTERVAL_MINUTES || '15');
+    // Lese Intervall aus Datenbank (oder verwende Fallback aus ENV)
+    let intervalMinutes = this.db.getSchedulerInterval();
+    
+    // Fallback auf ENV wenn DB leer
+    if (!intervalMinutes) {
+      intervalMinutes = parseInt(process.env.TEST_INTERVAL_MINUTES || '15');
+      this.db.setSchedulerInterval(intervalMinutes);
+    }
+    
+    this.currentIntervalMinutes = intervalMinutes;
     
     console.log(`⏰ Starte 24/7 Monitoring mit ${intervalMinutes}-Minuten-Intervall`);
 
@@ -92,6 +103,32 @@ export class TestScheduler {
       console.log('🚀 Führe initialen Test-Durchlauf aus...');
       setTimeout(() => this.executeScheduledTests(), 5000); // Nach 5 Sekunden
     }
+  }
+
+  /**
+   * Aktualisiert das Intervall und startet den Cron-Job neu
+   */
+  updateInterval(intervalMinutes: number) {
+    console.log(`🔄 Ändere Scheduler-Intervall von ${this.currentIntervalMinutes} auf ${intervalMinutes} Minuten`);
+    
+    // Stoppe aktuellen Cron-Job
+    if (this.cronJob) {
+      this.cronJob.stop();
+      console.log('⏹️  Alter Cron-Job gestoppt');
+    }
+    
+    // Aktualisiere Intervall
+    this.currentIntervalMinutes = intervalMinutes;
+    
+    // Erstelle neuen Cron-Job mit neuem Intervall
+    const cronExpression = this.getCronExpression(intervalMinutes);
+    console.log(`📅 Neue Cron-Expression: ${cronExpression}`);
+    
+    this.cronJob = cron.schedule(cronExpression, async () => {
+      await this.executeScheduledTests();
+    });
+    
+    console.log(`✅ Scheduler neu gestartet mit ${intervalMinutes}-Minuten-Intervall`);
   }
 
   /**
@@ -217,6 +254,19 @@ let globalScheduler: TestScheduler | null = null;
 
 export function getScheduler(): TestScheduler | null {
   return globalScheduler;
+}
+
+/**
+ * Benachrichtigt den Worker über eine Intervall-Änderung
+ * Wird vom API-Server aufgerufen
+ */
+export async function notifyIntervalChange(intervalMinutes: number): Promise<void> {
+  if (globalScheduler) {
+    globalScheduler.updateInterval(intervalMinutes);
+    console.log(`✅ Worker über Intervall-Änderung benachrichtigt: ${intervalMinutes} Minuten`);
+  } else {
+    console.warn('⚠️  Kein globaler Scheduler vorhanden - Intervall wird beim nächsten Start übernommen');
+  }
 }
 
 // Hauptfunktion

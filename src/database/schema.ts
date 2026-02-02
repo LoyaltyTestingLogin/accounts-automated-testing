@@ -10,7 +10,7 @@ export interface TestRun {
   id: number;
   testName: string;
   testSuite: string;
-  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout' | 'cancelled';
   startTime: string;
   endTime: string | null;
   duration: number | null;
@@ -23,12 +23,13 @@ export interface TestRun {
   progress: number | null; // 0-100 für Fortschritt
   totalTests: number | null; // Anzahl der Tests in dieser Suite
   completedTests: number | null; // Anzahl abgeschlossener Tests
+  processPid: number | null; // PID des laufenden Playwright-Prozesses
 }
 
 export interface TestRunInsert {
   testName: string;
   testSuite: string;
-  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout';
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'timeout' | 'cancelled';
   startTime: string;
   endTime?: string | null;
   duration?: number | null;
@@ -41,6 +42,7 @@ export interface TestRunInsert {
   progress?: number | null;
   totalTests?: number | null;
   completedTests?: number | null;
+  processPid?: number | null;
 }
 
 export class TestDatabase {
@@ -64,7 +66,7 @@ export class TestDatabase {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         testName TEXT NOT NULL,
         testSuite TEXT NOT NULL,
-        status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'passed', 'failed', 'timeout')),
+        status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'passed', 'failed', 'timeout', 'cancelled')),
         startTime TEXT NOT NULL,
         endTime TEXT,
         duration INTEGER,
@@ -96,6 +98,9 @@ export class TestDatabase {
     const columns = this.db.pragma("table_info(test_runs)").map((col: any) => col.name);
     if (!columns.includes('progress')) {
       this.db.exec('ALTER TABLE test_runs ADD COLUMN progress INTEGER DEFAULT 0');
+    }
+    if (!columns.includes('processPid')) {
+      this.db.exec('ALTER TABLE test_runs ADD COLUMN processPid INTEGER');
     }
     if (!columns.includes('totalTests')) {
       this.db.exec('ALTER TABLE test_runs ADD COLUMN totalTests INTEGER DEFAULT 1');
@@ -205,7 +210,7 @@ export class TestDatabase {
   }
 
   /**
-   * Statistiken abrufen
+   * Statistiken abrufen (cancelled Tests werden nicht mitgezählt)
    */
   getStatistics() {
     const stats = this.db.prepare(`
@@ -217,6 +222,7 @@ export class TestDatabase {
         AVG(CASE WHEN duration IS NOT NULL THEN duration ELSE NULL END) as avgDuration
       FROM test_runs
       WHERE startTime >= datetime('now', '-7 days')
+        AND status != 'cancelled'
     `).get();
 
     return stats;
@@ -275,6 +281,29 @@ export class TestDatabase {
     const stmt = this.db.prepare('SELECT value FROM scheduler_status WHERE key = ?');
     const result = stmt.get('isPaused') as { value: string } | undefined;
     return result?.value === '1';
+  }
+
+  /**
+   * Scheduler-Intervall setzen (in Minuten)
+   */
+  setSchedulerInterval(minutes: number): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO scheduler_status (key, value, updatedAt)
+      VALUES ('intervalMinutes', ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updatedAt = CURRENT_TIMESTAMP
+    `);
+    stmt.run(String(minutes));
+  }
+
+  /**
+   * Scheduler-Intervall abfragen (in Minuten, default: 15)
+   */
+  getSchedulerInterval(): number {
+    const stmt = this.db.prepare('SELECT value FROM scheduler_status WHERE key = ?');
+    const result = stmt.get('intervalMinutes') as { value: string } | undefined;
+    return result ? parseInt(result.value) : 15;
   }
 
   /**
