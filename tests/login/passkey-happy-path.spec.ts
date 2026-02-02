@@ -68,84 +68,62 @@ test.describe('CHECK24 Login - Passkey', () => {
       console.log('🖱️  Klicke auf "mit Passkey anmelden"...');
       await passkeyButton.click();
       
-      // 5. Apple Keychain Dialog mit AppleScript automatisieren
-      console.log('⏳ Warte 1 Sekunde auf Keychain-Dialog...');
+      // 5. Keychain Dialog automatisieren: Enter → Passwort → Enter
+      console.log('⏳ Warte 1 Sekunde auf Dialog...');
       await page.waitForTimeout(1000);
       
-      console.log('🍎 Versuche Keychain-Dialog mit AppleScript zu bestätigen...');
+      console.log('🍎 Automatisiere Keychain-Dialog mit AppleScript...');
       
-      // Strategie 1: Enter-Taste drücken
-      console.log('   Versuch 1: Enter-Taste...');
-      const appleScriptEnter = `
+      // Schritt 1: Enter drücken (für "Fortfahren" Button)
+      console.log('   Schritt 1: Enter drücken (Fortfahren)...');
+      const appleScriptStep1 = `
         tell application "System Events"
           keystroke return
         end tell
       `;
       
       try {
-        await execAsync(`osascript -e '${appleScriptEnter}'`);
+        await execAsync(`osascript -e '${appleScriptStep1}'`);
         console.log('   ✅ Enter gedrückt');
-        await page.waitForTimeout(1000);
       } catch (error) {
         console.log('   ⚠️  Enter fehlgeschlagen:', (error as Error).message.split('\n')[0]);
       }
       
-      // Strategie 2: Space-Taste (für Buttons)
-      console.log('   Versuch 2: Space-Taste...');
-      const appleScriptSpace = `
+      // Kurz warten
+      await page.waitForTimeout(1000);
+      
+      // Schritt 2: Passwort "1qay1qay" eingeben
+      console.log('   Schritt 2: Passwort eingeben...');
+      const password = '1qay1qay';
+      const appleScriptStep2 = `
         tell application "System Events"
-          keystroke space
+          keystroke "${password}"
         end tell
       `;
       
       try {
-        await execAsync(`osascript -e '${appleScriptSpace}'`);
-        console.log('   ✅ Space gedrückt');
-        await page.waitForTimeout(1000);
+        await execAsync(`osascript -e '${appleScriptStep2}'`);
+        console.log('   ✅ Passwort eingegeben');
       } catch (error) {
-        console.log('   ⚠️  Space fehlgeschlagen');
+        console.log('   ⚠️  Passwort-Eingabe fehlgeschlagen');
       }
       
-      // Strategie 3: Tab + Enter (zum Button navigieren und bestätigen)
-      console.log('   Versuch 3: Tab + Enter...');
-      const appleScriptTabEnter = `
+      // Kurz warten
+      await page.waitForTimeout(500);
+      
+      // Schritt 3: Enter drücken (bestätigen)
+      console.log('   Schritt 3: Enter drücken (Bestätigen)...');
+      const appleScriptStep3 = `
         tell application "System Events"
-          keystroke tab
-          delay 0.5
           keystroke return
         end tell
       `;
       
       try {
-        await execAsync(`osascript -e '${appleScriptTabEnter}'`);
-        console.log('   ✅ Tab + Enter gedrückt');
-        await page.waitForTimeout(1500);
+        await execAsync(`osascript -e '${appleScriptStep3}'`);
+        console.log('   ✅ Enter gedrückt (Bestätigung)');
       } catch (error) {
-        console.log('   ⚠️  Tab + Enter fehlgeschlagen');
-      }
-      
-      // Strategie 4: Suche nach Dialog und klicke auf Button
-      console.log('   Versuch 4: Dialog-Button suchen und klicken...');
-      const appleScriptClickButton = `
-        tell application "System Events"
-          if exists (button 1 of window 1 of application process "SecurityAgent") then
-            click button 1 of window 1 of application process "SecurityAgent"
-            return "clicked"
-          end if
-          if exists (button 1 of window 1 of application process "Google Chrome") then
-            click button 1 of window 1 of application process "Google Chrome"
-            return "clicked"
-          end if
-          return "not found"
-        end tell
-      `;
-      
-      try {
-        const { stdout } = await execAsync(`osascript -e '${appleScriptClickButton}'`);
-        console.log('   ✅ AppleScript Ergebnis:', stdout.trim());
-        await page.waitForTimeout(2000);
-      } catch (error) {
-        console.log('   ⚠️  Button-Klick fehlgeschlagen');
+        console.log('   ⚠️  Bestätigung fehlgeschlagen');
       }
       
       // 6. Warte auf Weiterleitung zur Kundenbereich-Seite
