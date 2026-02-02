@@ -136,6 +136,29 @@ app.get('/api/statistics', (req, res) => {
 });
 
 /**
+ * GET /api/cleanup-config
+ * Gibt Cleanup-Konfiguration zurück
+ */
+app.get('/api/cleanup-config', (req, res) => {
+  try {
+    const cleanupDays = parseInt(process.env.CLEANUP_DAYS || '4');
+    
+    res.json({
+      success: true,
+      data: {
+        cleanupDays,
+      },
+    });
+  } catch (error: any) {
+    console.error('Fehler beim Abrufen der Cleanup-Konfiguration:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/run-tests
  * Startet Tests manuell und gibt die Run-ID zurück
  */
@@ -523,6 +546,7 @@ function startServer() {
     console.log(`   GET  /api/test-logs/:runId/stream (SSE)`);
     console.log(`   GET  /api/scheduler/status`);
     console.log(`   GET  /api/scheduler/interval`);
+    console.log(`   GET  /api/cleanup-config`);
     console.log(`   POST /api/run-tests`);
     console.log(`   POST /api/test-slack`);
     console.log(`   POST /api/scheduler/pause`);

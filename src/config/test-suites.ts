@@ -43,14 +43,14 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     id: 'registration-email',
     name: 'Registrierung - E-Mail Registrierung',
     path: 'tests/registration/email-registrierung-happy-path.spec.ts',
-    description: 'Vollständiger E-Mail-Registrierungs-Flow\n\n• E-Mail eingeben\n\n• Passwort wählen\n\n• TAN-Verifizierung per E-Mail\n\n• Registrierung abschließen',
+    description: 'Vollständiger E-Mail-Registrierungs-Flow\n\n• E-Mail eingeben\n\n• Passwort wählen\n\n• TAN-Verifizierung per E-Mail\n\n• Registrierung abschließen\n\n• Account wird über "Anmelden & Sicherheit" gelöscht',
     testCount: 1,
   },
   {
     id: 'registration-phone',
     name: 'Registrierung - Phone Registrierung',
     path: 'tests/registration/phone-registrierung-happy-path.spec.ts',
-    description: 'Vollständiger Phone-Registrierungs-Flow\n\n• Phone eingeben\n\n• Passwort wählen (optional)\n\n• TAN-Verifizierung per SMS\n\n• Registrierung abschließen',
+    description: 'Vollständiger Phone-Registrierungs-Flow\n\n• Phone eingeben\n\n• Passwort wählen (optional)\n\n• TAN-Verifizierung per SMS\n\n• Registrierung abschließen\n\n• Account wird über "Anmelden & Sicherheit" gelöscht',
     testCount: 1,
   },
 ];

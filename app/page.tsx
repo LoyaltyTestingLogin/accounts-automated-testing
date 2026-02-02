@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [changingInterval, setChangingInterval] = useState(false);
   const [environment, setEnvironment] = useState<'prod' | 'test'>('prod');
   const [environmentLoaded, setEnvironmentLoaded] = useState(false);
+  const [cleanupDays, setCleanupDays] = useState<number>(4);
 
   // Lade gespeicherte Umgebung aus localStorage beim ersten Render
   useEffect(() => {
@@ -122,12 +123,13 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [runsRes, statsRes, suitesRes, schedulerRes, intervalRes] = await Promise.all([
+      const [runsRes, statsRes, suitesRes, schedulerRes, intervalRes, cleanupRes] = await Promise.all([
         axios.get(`/api/test-runs?limit=20&environment=${environment}`),
         axios.get(`/api/statistics?environment=${environment}`),
         axios.get('/api/test-suites'),
         axios.get('/api/scheduler/status').catch(() => ({ data: { data: { available: false, isPaused: false } } })),
         axios.get('/api/scheduler/interval').catch(() => ({ data: { data: { intervalMinutes: 15 } } })),
+        axios.get('/api/cleanup-config').catch(() => ({ data: { data: { cleanupDays: 4 } } })),
       ]);
 
       setTestRuns(runsRes.data.data || []);
@@ -143,6 +145,11 @@ export default function Dashboard() {
       // Scheduler Intervall
       if (intervalRes.data?.data) {
         setSchedulerInterval(intervalRes.data.data.intervalMinutes || 15);
+      }
+      
+      // Cleanup-Konfiguration
+      if (cleanupRes.data?.data) {
+        setCleanupDays(cleanupRes.data.data.cleanupDays || 4);
       }
       
       // Berechne geschätzte Gesamtdauer basierend auf "All Tests" Runs
@@ -648,9 +655,14 @@ export default function Dashboard() {
 
       {/* Test-Runs Liste */}
       <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Letzte Test-Durchläufe
-        </h2>
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">
+            Letzte Test-Durchläufe
+          </h2>
+          <div className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+            <span className="font-medium">🧹 Auto-Cleanup:</span> Test-Runs älter als {cleanupDays} Tage werden täglich um 3:00 Uhr automatisch gelöscht
+          </div>
+        </div>
 
         {testRuns.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
