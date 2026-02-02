@@ -33,6 +33,13 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     testCount: 3,
   },
   {
+    id: 'login-passkey',
+    name: 'Login - Passkey Login',
+    path: 'tests/login/passkey-happy-path.spec.ts',
+    description: 'Vollständiger Passkey Login-Flow mit Apple Keychain\n\n• Test Case 1: Passkey über Button (E-Mail eingeben → Weiter → "mit Passkey anmelden")\n\n• Test Case 2: Passkey über Conditional UI (Email-Feld klicken → Passkey-Vorschlag auswählen)\n\n⚠️ Benötigt macOS Accessibility-Berechtigung für AppleScript',
+    testCount: 2,
+  },
+  {
     id: 'registration-email',
     name: 'Registrierung - E-Mail Registrierung',
     path: 'tests/registration/email-registrierung-happy-path.spec.ts',
