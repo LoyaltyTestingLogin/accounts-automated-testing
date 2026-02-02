@@ -42,13 +42,14 @@ app.get('/api/test-runs', (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const status = req.query.status as string;
+    const environment = req.query.environment as 'prod' | 'test' | undefined;
 
     let testRuns;
     
     if (status && ['pending', 'running', 'passed', 'failed', 'timeout', 'cancelled'].includes(status)) {
-      testRuns = db.getTestRunsByStatus(status as any, limit);
+      testRuns = db.getTestRunsByStatus(status as any, limit, environment);
     } else {
-      testRuns = db.getRecentTestRuns(limit);
+      testRuns = db.getRecentTestRuns(limit, environment);
     }
 
     res.json({
@@ -118,7 +119,8 @@ app.get('/api/test-runs/:id', (req, res) => {
  */
 app.get('/api/statistics', (req, res) => {
   try {
-    const stats = db.getStatistics();
+    const environment = req.query.environment as 'prod' | 'test' | undefined;
+    const stats = db.getStatistics(environment);
 
     res.json({
       success: true,
@@ -139,7 +141,7 @@ app.get('/api/statistics', (req, res) => {
  */
 app.post('/api/run-tests', async (req, res) => {
   try {
-    const { testPath, project, headed } = req.body;
+    const { testPath, project, headed, environment } = req.body;
     const { getTestCountForPath } = require('../config/test-suites');
 
     // Erstelle Test-Run sofort und gebe ID zurück
@@ -155,6 +157,7 @@ app.post('/api/run-tests', async (req, res) => {
       progress: 0,
       totalTests,
       completedTests: 0,
+      environment: environment || 'prod',
     });
 
     // Test-Run im Hintergrund starten (nicht blockierend)
@@ -166,6 +169,7 @@ app.post('/api/run-tests', async (req, res) => {
           headed: headed || false,
           triggeredBy: 'manual',
           existingRunId: runId, // Verwende die bereits erstellte Run-ID
+          environment: environment || 'prod',
         });
       } catch (error) {
         console.error('Fehler beim Test-Run:', error);

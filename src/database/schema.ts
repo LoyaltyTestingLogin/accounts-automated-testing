@@ -24,6 +24,7 @@ export interface TestRun {
   totalTests: number | null; // Anzahl der Tests in dieser Suite
   completedTests: number | null; // Anzahl abgeschlossener Tests
   processPid: number | null; // PID des laufenden Playwright-Prozesses
+  environment: 'prod' | 'test';
 }
 
 export interface TestRunInsert {
@@ -43,6 +44,7 @@ export interface TestRunInsert {
   totalTests?: number | null;
   completedTests?: number | null;
   processPid?: number | null;
+  environment?: 'prod' | 'test';
 }
 
 export class TestDatabase {
@@ -102,6 +104,9 @@ export class TestDatabase {
     if (!columns.includes('processPid')) {
       this.db.exec('ALTER TABLE test_runs ADD COLUMN processPid INTEGER');
     }
+    if (!columns.includes('environment')) {
+      this.db.exec("ALTER TABLE test_runs ADD COLUMN environment TEXT DEFAULT 'prod' CHECK(environment IN ('prod', 'test'))");
+    }
     if (!columns.includes('totalTests')) {
       this.db.exec('ALTER TABLE test_runs ADD COLUMN totalTests INTEGER DEFAULT 1');
     }
@@ -120,11 +125,11 @@ export class TestDatabase {
       INSERT INTO test_runs (
         testName, testSuite, status, startTime, endTime, duration,
         errorMessage, screenshotPath, videoPath, tracePath, triggeredBy, slackNotified,
-        progress, totalTests, completedTests
+        progress, totalTests, completedTests, environment
       ) VALUES (
         @testName, @testSuite, @status, @startTime, @endTime, @duration,
         @errorMessage, @screenshotPath, @videoPath, @tracePath, @triggeredBy, @slackNotified,
-        @progress, @totalTests, @completedTests
+        @progress, @totalTests, @completedTests, @environment
       )
     `);
 
@@ -140,6 +145,7 @@ export class TestDatabase {
       progress: testRun.progress || 0,
       totalTests: testRun.totalTests || 1,
       completedTests: testRun.completedTests || 0,
+      environment: testRun.environment || 'prod',
     });
 
     return result.lastInsertRowid as number;
@@ -183,37 +189,40 @@ export class TestDatabase {
   /**
    * Letzte Test-Runs abrufen
    */
-  getRecentTestRuns(limit = 50): TestRun[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM test_runs 
-      ORDER BY startTime DESC 
-      LIMIT ?
-    `);
+  getRecentTestRuns(limit = 50, environment?: 'prod' | 'test'): TestRun[] {
+    const query = environment 
+      ? `SELECT * FROM test_runs WHERE environment = ? ORDER BY startTime DESC LIMIT ?`
+      : `SELECT * FROM test_runs ORDER BY startTime DESC LIMIT ?`;
     
-    const rows = stmt.all(limit) as any[];
-    return rows.map(row => this.mapRowToTestRun(row));
+    const stmt = this.db.prepare(query);
+    const rows = environment ? stmt.all(environment, limit) : stmt.all(limit);
+    
+    return (rows as any[]).map(row => this.mapRowToTestRun(row));
   }
 
   /**
    * Test-Runs nach Status filtern
    */
-  getTestRunsByStatus(status: TestRun['status'], limit = 50): TestRun[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM test_runs 
-      WHERE status = ?
-      ORDER BY startTime DESC 
-      LIMIT ?
-    `);
+  getTestRunsByStatus(status: TestRun['status'], limit = 50, environment?: 'prod' | 'test'): TestRun[] {
+    const query = environment
+      ? `SELECT * FROM test_runs WHERE status = ? AND environment = ? ORDER BY startTime DESC LIMIT ?`
+      : `SELECT * FROM test_runs WHERE status = ? ORDER BY startTime DESC LIMIT ?`;
     
-    const rows = stmt.all(status, limit) as any[];
-    return rows.map(row => this.mapRowToTestRun(row));
+    const stmt = this.db.prepare(query);
+    const rows = environment ? stmt.all(status, environment, limit) : stmt.all(status, limit);
+    
+    return (rows as any[]).map(row => this.mapRowToTestRun(row));
   }
 
   /**
    * Statistiken abrufen (cancelled Tests werden nicht mitgezählt)
    */
-  getStatistics() {
-    const stats = this.db.prepare(`
+  getStatistics(environment?: 'prod' | 'test') {
+    const whereClause = environment
+      ? `WHERE startTime >= datetime('now', '-7 days') AND status != 'cancelled' AND environment = ?`
+      : `WHERE startTime >= datetime('now', '-7 days') AND status != 'cancelled'`;
+    
+    const query = `
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) as passed,
@@ -221,9 +230,11 @@ export class TestDatabase {
         SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) as running,
         AVG(CASE WHEN duration IS NOT NULL THEN duration ELSE NULL END) as avgDuration
       FROM test_runs
-      WHERE startTime >= datetime('now', '-7 days')
-        AND status != 'cancelled'
-    `).get();
+      ${whereClause}
+    `;
+    
+    const stmt = this.db.prepare(query);
+    const stats = environment ? stmt.get(environment) : stmt.get();
 
     return stats;
   }

@@ -1,5 +1,6 @@
 import { test, expect, chromium } from '@playwright/test';
 import { TEST_ACCOUNTS } from '../fixtures/accounts';
+import { getLoginUrl } from '../helpers/environment';
 import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
@@ -37,7 +38,7 @@ test.describe('CHECK24 Login - Passkey', () => {
 
     try {
       // 1. Zur Login-Seite navigieren
-      const baseUrl = process.env.CHECK24_BASE_URL || 'https://accounts.check24.com';
+      const baseUrl = getLoginUrl();
       const loginUrl = `${baseUrl}/login?redirect_uri=https://kundenbereich.check24.de`;
       
       console.log('📍 Navigiere zu:', loginUrl);
@@ -216,7 +217,7 @@ test.describe('CHECK24 Login - Passkey', () => {
 
     try {
       // 1. Zur Login-Seite navigieren
-      const baseUrl = process.env.CHECK24_BASE_URL || 'https://accounts.check24.com';
+      const baseUrl = getLoginUrl();
       const loginUrl = `${baseUrl}/login?redirect_uri=https://kundenbereich.check24.de`;
       
       console.log('📍 Navigiere zu:', loginUrl);

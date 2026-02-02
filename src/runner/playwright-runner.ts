@@ -24,6 +24,7 @@ export interface TestRunOptions {
   headed?: boolean;   // Im headed mode ausführen
   triggeredBy: 'manual' | 'scheduled';
   existingRunId?: number; // Optionale existierende Run-ID für Live-Logs
+  environment?: 'prod' | 'test'; // TEST oder PROD Umgebung
 }
 
 export interface TestResult {
@@ -48,9 +49,10 @@ export class PlaywrightRunner {
    * Führt Playwright-Tests aus
    */
   async runTests(options: TestRunOptions): Promise<TestResult[]> {
-    const { testPath, project, headed, triggeredBy, existingRunId } = options;
+    const { testPath, project, headed, triggeredBy, existingRunId, environment } = options;
 
-    console.log(`🧪 Starte Tests: ${testPath || 'alle Tests'}`);
+    const env = environment || 'prod';
+    console.log(`🧪 Starte Tests: ${testPath || 'alle Tests'} auf ${env.toUpperCase()}`);
 
     // Test-Run in DB erstellen oder existierende verwenden
     const testName = testPath || 'All Tests';
@@ -65,6 +67,7 @@ export class PlaywrightRunner {
         status: 'running',
         testName,
         testSuite,
+        environment: env,
       });
       console.log(`📝 Verwende existierende Run-ID: ${runId}`);
     } else {
@@ -80,6 +83,7 @@ export class PlaywrightRunner {
         progress: 0,
         totalTests,
         completedTests: 0,
+        environment: env,
       });
       console.log(`📝 Neue Run-ID erstellt: ${runId}`);
     }
@@ -88,13 +92,13 @@ export class PlaywrightRunner {
 
     try {
       // Playwright-Kommando zusammenbauen
-      const command = this.buildPlaywrightCommand({ testPath, project, headed });
+      const command = this.buildPlaywrightCommand({ testPath, project, headed, environment: env });
       
       console.log(`📝 Führe aus: ${command}`);
       testLogEmitter.emit('log', { runId, message: `📝 Führe aus: ${command}\n`, timestamp: new Date().toISOString() });
 
       // Tests mit Live-Streaming ausführen
-      await this.runTestsWithLiveOutput(command, runId, { headed });
+      await this.runTestsWithLiveOutput(command, runId, { headed, environment: env });
 
       const duration = Date.now() - startTime;
 
@@ -242,7 +246,7 @@ export class PlaywrightRunner {
   /**
    * Führt Tests mit Live-Output aus
    */
-  private runTestsWithLiveOutput(command: string, runId: number, options?: { headed?: boolean }): Promise<void> {
+  private runTestsWithLiveOutput(command: string, runId: number, options?: { headed?: boolean; environment?: 'prod' | 'test' }): Promise<void> {
     return new Promise((resolve, reject) => {
       // Kommando in Teile aufteilen für spawn
       const [cmd, ...args] = command.split(' ');
@@ -254,6 +258,8 @@ export class PlaywrightRunner {
           FORCE_COLOR: '0', // Keine Farb-Codes für saubere Logs
           // Browser rechts positionieren wenn headed mode
           BROWSER_POSITION: options?.headed ? 'right' : undefined,
+          // Umgebung für Tests
+          TEST_ENVIRONMENT: options?.environment || 'prod',
         },
         shell: true,
       });

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { loginWithPassword, expectLoginSuccess, logout, handleLoginChallenge } from '../helpers/auth';
 import { getAccountCredentials } from '../fixtures/accounts';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
+import { getLoginUrl } from '../helpers/environment';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -621,8 +622,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
 
   test('Login-Seite lädt korrekt', async ({ page }) => {
     // Zur Login-Seite navigieren
-    const loginUrl = process.env.CHECK24_BASE_URL;
-    if (!loginUrl) throw new Error('CHECK24_BASE_URL muss in .env definiert sein');
+    const loginUrl = getLoginUrl();
     
     await page.goto(loginUrl);
     await page.waitForLoadState('networkidle');
@@ -643,8 +643,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
   });
 
   test('Login-Formular ist interaktiv', async ({ page }) => {
-    const loginUrl = process.env.CHECK24_BASE_URL;
-    if (!loginUrl) throw new Error('CHECK24_BASE_URL muss in .env definiert sein');
+    const loginUrl = getLoginUrl();
     
     await page.goto(loginUrl);
     await page.waitForLoadState('networkidle');

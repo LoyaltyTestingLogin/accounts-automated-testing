@@ -1,6 +1,7 @@
 import { Page, expect } from '@playwright/test';
 import dotenv from 'dotenv';
 import { getEmailClient } from './email';
+import { getLoginUrl, getEnvironmentName } from './environment';
 
 dotenv.config();
 
@@ -17,11 +18,9 @@ export async function loginWithPassword(page: Page, email: string, password: str
     throw new Error('E-Mail und Passwort sind erforderlich. Verwende getAccountCredentials() aus tests/fixtures/accounts.ts');
   }
 
-  // Zur Login-Seite navigieren (vollständige URL aus .env)
-  const loginUrl = process.env.CHECK24_BASE_URL;
-  if (!loginUrl) {
-    throw new Error('CHECK24_BASE_URL muss in .env definiert sein');
-  }
+  // Zur Login-Seite navigieren (URL basierend auf Umgebung)
+  const loginUrl = getLoginUrl();
+  console.log(`🌍 Umgebung: ${getEnvironmentName()} - ${loginUrl}`);
   await page.goto(loginUrl);
 
   // Warten bis Seite geladen ist
@@ -76,8 +75,8 @@ export async function loginWithPassword(page: Page, email: string, password: str
 export async function expectLoginSuccess(page: Page) {
   const currentUrl = page.url();
   
-  // Prüfe ob wir auf der Kundenbereich-Seite sind
-  if (!currentUrl.includes('kundenbereich.check24.de')) {
+  // Prüfe ob wir auf der Kundenbereich-Seite sind (PROD oder TEST)
+  if (!currentUrl.includes('kundenbereich.check24.de') && !currentUrl.includes('kundenbereich.check24-test.de') && !currentUrl.includes('accounts.check24.com') && !currentUrl.includes('accounts.check24-test.com')) {
     // Prüfe auf Fehlermeldungen auf der Login-Seite
     const errorSelectors = [
       page.locator('[role="alert"]'),

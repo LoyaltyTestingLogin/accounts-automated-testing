@@ -20,6 +20,7 @@ interface TestRun {
   progress: number | null;
   totalTests: number | null;
   completedTests: number | null;
+  environment: 'prod' | 'test';
 }
 
 interface Statistics {
@@ -54,14 +55,38 @@ export default function Dashboard() {
   const [estimatedTotalDuration, setEstimatedTotalDuration] = useState<number | null>(null);
   const [schedulerInterval, setSchedulerInterval] = useState(15);
   const [changingInterval, setChangingInterval] = useState(false);
+  const [environment, setEnvironment] = useState<'prod' | 'test'>('prod');
+  const [environmentLoaded, setEnvironmentLoaded] = useState(false);
+
+  // Lade gespeicherte Umgebung aus localStorage beim ersten Render
+  useEffect(() => {
+    const savedEnv = localStorage.getItem('testEnvironment') as 'prod' | 'test' | null;
+    if (savedEnv === 'prod' || savedEnv === 'test') {
+      setEnvironment(savedEnv);
+    }
+    setEnvironmentLoaded(true);
+  }, []);
+
+  // Speichere Umgebung in localStorage bei Änderung
+  useEffect(() => {
+    if (environmentLoaded) {
+      localStorage.setItem('testEnvironment', environment);
+    }
+  }, [environment, environmentLoaded]);
 
   useEffect(() => {
-    fetchData();
+    if (environmentLoaded) {
+      fetchData();
+    }
     
     // Auto-Refresh alle 10 Sekunden
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(() => {
+      if (environmentLoaded) {
+        fetchData();
+      }
+    }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [environment, environmentLoaded]);
 
 
   const formatEstimatedDuration = (ms: number): string => {
@@ -98,8 +123,8 @@ export default function Dashboard() {
   const fetchData = async () => {
     try {
       const [runsRes, statsRes, suitesRes, schedulerRes, intervalRes] = await Promise.all([
-        axios.get('/api/test-runs?limit=20'),
-        axios.get('/api/statistics'),
+        axios.get(`/api/test-runs?limit=20&environment=${environment}`),
+        axios.get(`/api/statistics?environment=${environment}`),
         axios.get('/api/test-suites'),
         axios.get('/api/scheduler/status').catch(() => ({ data: { data: { available: false, isPaused: false } } })),
         axios.get('/api/scheduler/interval').catch(() => ({ data: { data: { intervalMinutes: 15 } } })),
@@ -200,6 +225,7 @@ export default function Dashboard() {
       const response = await axios.post('/api/run-tests', {
         testPath: actualTestPath,
         headed: true,
+        environment,
       });
 
       // Öffne Live-Log in neuem Fenster (links positioniert, 1/3 Breite)
@@ -289,6 +315,33 @@ export default function Dashboard() {
           <p className="text-gray-600">
             Automatisiertes E2E Testing mit 24/7 Monitoring
           </p>
+        </div>
+
+        {/* Environment Switch */}
+        <div className="flex flex-col items-center gap-2">
+          <label className="text-xs text-gray-600 font-medium">Umgebung</label>
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setEnvironment('test')}
+              className={`px-6 py-2 rounded-md font-semibold text-sm transition-all ${
+                environment === 'test'
+                  ? 'bg-white text-orange-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              TEST
+            </button>
+            <button
+              onClick={() => setEnvironment('prod')}
+              className={`px-6 py-2 rounded-md font-semibold text-sm transition-all ${
+                environment === 'prod'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              PROD
+            </button>
+          </div>
         </div>
         
         {/* Scheduler Controls */}

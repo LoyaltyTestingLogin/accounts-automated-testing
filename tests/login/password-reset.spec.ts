@@ -3,6 +3,7 @@ import { expectLoginSuccess, logout } from '../helpers/auth';
 import { getAccountCredentials } from '../fixtures/accounts';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
+import { getLoginUrl } from '../helpers/environment';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -19,10 +20,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log(`📧 Verwende Test-Account: ${credentials.account.description}`);
 
       // Zur Login-Seite navigieren
-      const loginUrl = process.env.CHECK24_BASE_URL;
-      if (!loginUrl) {
-        throw new Error('CHECK24_BASE_URL muss in .env definiert sein');
-      }
+      const loginUrl = getLoginUrl();
       await page.goto(loginUrl);
       await page.waitForLoadState('networkidle');
 
@@ -404,10 +402,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log(`📱 Phone: ${credentials.account.phone}`);
 
       // Zur Login-Seite navigieren
-      const loginUrl = process.env.CHECK24_BASE_URL;
-      if (!loginUrl) {
-        throw new Error('CHECK24_BASE_URL muss in .env definiert sein');
-      }
+      const loginUrl = getLoginUrl();
       await page.goto(loginUrl);
       await page.waitForLoadState('networkidle');
 
@@ -711,10 +706,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log(`📱 Phone: ${credentials.account.phone}`);
 
       // Zur Login-Seite navigieren
-      const loginUrl = process.env.CHECK24_BASE_URL;
-      if (!loginUrl) {
-        throw new Error('CHECK24_BASE_URL muss in .env definiert sein');
-      }
+      const loginUrl = getLoginUrl();
       await page.goto(loginUrl);
       await page.waitForLoadState('networkidle');
 
@@ -999,10 +991,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log(`🔒 2FA aktiviert: Ja`);
 
       // Zur Login-Seite navigieren
-      const loginUrl = process.env.CHECK24_BASE_URL;
-      if (!loginUrl) {
-        throw new Error('CHECK24_BASE_URL muss in .env definiert sein');
-      }
+      const loginUrl = getLoginUrl();
       await page.goto(loginUrl);
       await page.waitForLoadState('networkidle');
 
