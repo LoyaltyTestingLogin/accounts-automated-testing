@@ -14,8 +14,10 @@ export class TestScheduler {
   private runner = getPlaywrightRunner();
   private db = getDatabase();
   private isRunning = false;
-  private cronJob: cron.ScheduledTask | null = null;
-  private isPaused = false;
+  private cronJobProd: cron.ScheduledTask | null = null;
+  private cronJobTest: cron.ScheduledTask | null = null;
+  private isPausedProd = false;
+  private isPausedTest = false;
   private currentIntervalMinutes = 15;
 
   constructor() {
@@ -23,34 +25,42 @@ export class TestScheduler {
   }
 
   /**
-   * Pausiert den Scheduler (Tests laufen nicht mehr automatisch)
+   * Pausiert den Scheduler für eine Environment
    */
-  pause() {
-    const currentlyPaused = this.db.isSchedulerPaused();
+  pause(environment: 'prod' | 'test' = 'prod') {
+    const currentlyPaused = this.db.isSchedulerPaused(environment);
     if (currentlyPaused) {
-      console.log('⏸️  Scheduler ist bereits pausiert');
+      console.log(`⏸️  Scheduler für ${environment.toUpperCase()} ist bereits pausiert`);
       return false;
     }
     
-    this.db.setSchedulerPaused(true);
-    this.isPaused = true;
-    console.log('⏸️  Scheduler pausiert - automatische Tests gestoppt');
+    this.db.setSchedulerPaused(true, environment);
+    if (environment === 'prod') {
+      this.isPausedProd = true;
+    } else {
+      this.isPausedTest = true;
+    }
+    console.log(`⏸️  Scheduler für ${environment.toUpperCase()} pausiert - automatische Tests gestoppt`);
     return true;
   }
 
   /**
-   * Setzt den Scheduler fort (Tests laufen wieder automatisch)
+   * Setzt den Scheduler für eine Environment fort
    */
-  resume() {
-    const currentlyPaused = this.db.isSchedulerPaused();
+  resume(environment: 'prod' | 'test' = 'prod') {
+    const currentlyPaused = this.db.isSchedulerPaused(environment);
     if (!currentlyPaused) {
-      console.log('▶️  Scheduler läuft bereits');
+      console.log(`▶️  Scheduler für ${environment.toUpperCase()} läuft bereits`);
       return false;
     }
     
-    this.db.setSchedulerPaused(false);
-    this.isPaused = false;
-    console.log('▶️  Scheduler fortgesetzt - automatische Tests laufen wieder');
+    this.db.setSchedulerPaused(false, environment);
+    if (environment === 'prod') {
+      this.isPausedProd = false;
+    } else {
+      this.isPausedTest = false;
+    }
+    console.log(`▶️  Scheduler für ${environment.toUpperCase()} fortgesetzt - automatische Tests laufen wieder`);
     return true;
   }
 
@@ -58,14 +68,17 @@ export class TestScheduler {
    * Gibt den aktuellen Status zurück
    */
   getStatus() {
-    const isPaused = this.db.isSchedulerPaused();
-    this.isPaused = isPaused; // Sync Memory-State mit DB
+    const isPausedProd = this.db.isSchedulerPaused('prod');
+    const isPausedTest = this.db.isSchedulerPaused('test');
+    this.isPausedProd = isPausedProd; // Sync Memory-State mit DB
+    this.isPausedTest = isPausedTest;
     
     return {
-      isPaused: isPaused,
+      isPausedProd,
+      isPausedTest,
       isRunning: this.isRunning,
       intervalMinutes: this.currentIntervalMinutes,
-      cronExpression: this.cronJob ? this.getCronExpression(this.currentIntervalMinutes) : null,
+      cronExpression: this.cronJobProd ? this.getCronExpression(this.currentIntervalMinutes) : null,
     };
   }
 
@@ -91,17 +104,25 @@ export class TestScheduler {
     
     console.log(`📅 Cron-Expression: ${cronExpression}`);
 
-    // Cron-Job erstellen
-    this.cronJob = cron.schedule(cronExpression, async () => {
-      await this.executeScheduledTests();
+    // Cron-Job für PROD erstellen
+    this.cronJobProd = cron.schedule(cronExpression, async () => {
+      await this.executeScheduledTests('prod');
     });
 
-    console.log('✅ Scheduler gestartet');
+    // Cron-Job für TEST erstellen (gleiche Expression)
+    this.cronJobTest = cron.schedule(cronExpression, async () => {
+      await this.executeScheduledTests('test');
+    });
+
+    console.log('✅ Scheduler gestartet (PROD & TEST)');
 
     // Optional: Ersten Test sofort ausführen
     if (process.env.RUN_TESTS_ON_STARTUP === 'true') {
       console.log('🚀 Führe initialen Test-Durchlauf aus...');
-      setTimeout(() => this.executeScheduledTests(), 5000); // Nach 5 Sekunden
+      setTimeout(() => {
+        this.executeScheduledTests('prod');
+        this.executeScheduledTests('test');
+      }, 5000); // Nach 5 Sekunden
     }
   }
 
@@ -124,31 +145,38 @@ export class TestScheduler {
     const cronExpression = this.getCronExpression(intervalMinutes);
     console.log(`📅 Neue Cron-Expression: ${cronExpression}`);
     
-    this.cronJob = cron.schedule(cronExpression, async () => {
-      await this.executeScheduledTests();
+    this.cronJobProd = cron.schedule(cronExpression, async () => {
+      await this.executeScheduledTests('prod');
     });
     
-    console.log(`✅ Scheduler neu gestartet mit ${intervalMinutes}-Minuten-Intervall`);
+    this.cronJobTest = cron.schedule(cronExpression, async () => {
+      await this.executeScheduledTests('test');
+    });
+    
+    console.log(`✅ Scheduler neu gestartet mit ${intervalMinutes}-Minuten-Intervall (PROD & TEST)`);
   }
 
   /**
    * Stoppt den Scheduler
    */
   stop() {
-    if (this.cronJob) {
-      this.cronJob.stop();
-      console.log('⏹️  Scheduler gestoppt');
+    if (this.cronJobProd) {
+      this.cronJobProd.stop();
     }
+    if (this.cronJobTest) {
+      this.cronJobTest.stop();
+    }
+    console.log('⏹️  Scheduler gestoppt (PROD & TEST)');
   }
 
   /**
    * Führt geplante Tests aus
    */
-  private async executeScheduledTests() {
+  private async executeScheduledTests(environment: 'prod' | 'test' = 'prod') {
     // Prüfe Pause-Status aus Datenbank (für Prozess-übergreifende Kommunikation)
-    const isPaused = this.db.isSchedulerPaused();
+    const isPaused = this.db.isSchedulerPaused(environment);
     if (isPaused) {
-      console.log('⏸️  Scheduler ist pausiert, überspringe Test-Durchlauf');
+      console.log(`⏸️  Scheduler für ${environment.toUpperCase()} ist pausiert, überspringe Test-Durchlauf`);
       return;
     }
 
@@ -168,7 +196,7 @@ export class TestScheduler {
 
     try {
       console.log('\n' + '='.repeat(80));
-      console.log(`🔄 Automatischer Test-Durchlauf: ${new Date().toLocaleString('de-DE')}`);
+      console.log(`🔄 Automatischer Test-Durchlauf (${environment.toUpperCase()}): ${new Date().toLocaleString('de-DE')}`);
       console.log('='.repeat(80) + '\n');
 
       // Alle Login-Tests ausführen
@@ -176,6 +204,7 @@ export class TestScheduler {
         testPath: 'tests/login',
         triggeredBy: 'scheduled',
         headed: false,
+        environment,
       });
 
       // Zusammenfassung loggen

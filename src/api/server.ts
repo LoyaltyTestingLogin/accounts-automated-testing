@@ -304,14 +304,16 @@ app.get('/api/test-suites', (req, res) => {
  */
 app.get('/api/scheduler/status', (req, res) => {
   try {
-    const isPaused = db.isSchedulerPaused();
+    const isPausedProd = db.isSchedulerPaused('prod');
+    const isPausedTest = db.isSchedulerPaused('test');
     const intervalMinutes = db.getSchedulerInterval();
     
     res.json({
       success: true,
       data: {
         available: true,
-        isPaused: isPaused,
+        isPausedProd,
+        isPausedTest,
         isRunning: false, // Kann nur der Worker wissen
         intervalMinutes: intervalMinutes,
         cronExpression: `*/${intervalMinutes} * * * *`,
@@ -332,25 +334,28 @@ app.get('/api/scheduler/status', (req, res) => {
  */
 app.post('/api/scheduler/pause', (req, res) => {
   try {
-    const currentlyPaused = db.isSchedulerPaused();
+    const environment = (req.body.environment as 'prod' | 'test') || 'prod';
+    const currentlyPaused = db.isSchedulerPaused(environment);
     
     if (currentlyPaused) {
       return res.json({
         success: true,
-        message: 'Scheduler war bereits pausiert',
+        message: `Scheduler für ${environment.toUpperCase()} war bereits pausiert`,
         data: {
           isPaused: true,
+          environment,
         },
       });
     }
 
-    db.setSchedulerPaused(true);
+    db.setSchedulerPaused(true, environment);
     
     res.json({
       success: true,
-      message: 'Scheduler pausiert',
+      message: `Scheduler für ${environment.toUpperCase()} pausiert`,
       data: {
         isPaused: true,
+        environment,
       },
     });
   } catch (error: any) {
@@ -368,25 +373,28 @@ app.post('/api/scheduler/pause', (req, res) => {
  */
 app.post('/api/scheduler/resume', (req, res) => {
   try {
-    const currentlyPaused = db.isSchedulerPaused();
+    const environment = (req.body.environment as 'prod' | 'test') || 'prod';
+    const currentlyPaused = db.isSchedulerPaused(environment);
     
     if (!currentlyPaused) {
       return res.json({
         success: true,
-        message: 'Scheduler lief bereits',
+        message: `Scheduler für ${environment.toUpperCase()} lief bereits`,
         data: {
           isPaused: false,
+          environment,
         },
       });
     }
 
-    db.setSchedulerPaused(false);
+    db.setSchedulerPaused(false, environment);
     
     res.json({
       success: true,
-      message: 'Scheduler fortgesetzt',
+      message: `Scheduler für ${environment.toUpperCase()} fortgesetzt`,
       data: {
         isPaused: false,
+        environment,
       },
     });
   } catch (error: any) {

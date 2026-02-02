@@ -274,23 +274,25 @@ export class TestDatabase {
   /**
    * Scheduler-Status setzen (für Pause/Resume)
    */
-  setSchedulerPaused(isPaused: boolean): void {
+  setSchedulerPaused(isPaused: boolean, environment: 'prod' | 'test' = 'prod'): void {
+    const key = `isPaused_${environment}`;
     const stmt = this.db.prepare(`
       INSERT INTO scheduler_status (key, value, updatedAt)
-      VALUES ('isPaused', ?, CURRENT_TIMESTAMP)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(key) DO UPDATE SET
         value = excluded.value,
         updatedAt = CURRENT_TIMESTAMP
     `);
-    stmt.run(isPaused ? '1' : '0');
+    stmt.run(key, isPaused ? '1' : '0');
   }
 
   /**
    * Scheduler-Status abfragen
    */
-  isSchedulerPaused(): boolean {
+  isSchedulerPaused(environment: 'prod' | 'test' = 'prod'): boolean {
+    const key = `isPaused_${environment}`;
     const stmt = this.db.prepare('SELECT value FROM scheduler_status WHERE key = ?');
-    const result = stmt.get('isPaused') as { value: string } | undefined;
+    const result = stmt.get(key) as { value: string } | undefined;
     return result?.value === '1';
   }
 

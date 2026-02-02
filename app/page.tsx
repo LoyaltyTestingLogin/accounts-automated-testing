@@ -49,9 +49,11 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showTestInfo, setShowTestInfo] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [schedulerPaused, setSchedulerPaused] = useState(false);
+  const [schedulerPausedProd, setSchedulerPausedProd] = useState(false);
+  const [schedulerPausedTest, setSchedulerPausedTest] = useState(false);
   const [schedulerAvailable, setSchedulerAvailable] = useState(true);
-  const [togglingScheduler, setTogglingScheduler] = useState(false);
+  const [togglingSchedulerProd, setTogglingSchedulerProd] = useState(false);
+  const [togglingSchedulerTest, setTogglingSchedulerTest] = useState(false);
   const [estimatedTotalDuration, setEstimatedTotalDuration] = useState<number | null>(null);
   const [schedulerInterval, setSchedulerInterval] = useState(15);
   const [changingInterval, setChangingInterval] = useState(false);
@@ -139,7 +141,8 @@ export default function Dashboard() {
       // Scheduler Status
       if (schedulerRes.data?.data) {
         setSchedulerAvailable(schedulerRes.data.data.available);
-        setSchedulerPaused(schedulerRes.data.data.isPaused || false);
+        setSchedulerPausedProd(schedulerRes.data.data.isPausedProd || false);
+        setSchedulerPausedTest(schedulerRes.data.data.isPausedTest || false);
       }
       
       // Scheduler Intervall
@@ -163,23 +166,39 @@ export default function Dashboard() {
   };
 
   const toggleScheduler = async () => {
-    if (togglingScheduler || !schedulerAvailable) return;
+    const env = environment; // Verwende das aktuell ausgewählte Environment
+    const isToggling = env === 'prod' ? togglingSchedulerProd : togglingSchedulerTest;
+    const isPaused = env === 'prod' ? schedulerPausedProd : schedulerPausedTest;
+    
+    if (isToggling || !schedulerAvailable) return;
 
-    setTogglingScheduler(true);
+    if (env === 'prod') {
+      setTogglingSchedulerProd(true);
+    } else {
+      setTogglingSchedulerTest(true);
+    }
     
     try {
-      const endpoint = schedulerPaused ? '/api/scheduler/resume' : '/api/scheduler/pause';
-      const response = await axios.post(endpoint);
+      const endpoint = isPaused ? '/api/scheduler/resume' : '/api/scheduler/pause';
+      const response = await axios.post(endpoint, { environment: env });
       
       if (response.data.success) {
-        setSchedulerPaused(!schedulerPaused);
-        alert(schedulerPaused ? '▶️ Automatische Tests laufen wieder' : '⏸️ Automatische Tests pausiert');
+        if (env === 'prod') {
+          setSchedulerPausedProd(!isPaused);
+        } else {
+          setSchedulerPausedTest(!isPaused);
+        }
+        alert(`${env.toUpperCase()}: ${isPaused ? '▶️ Automatische Tests laufen wieder' : '⏸️ Automatische Tests pausiert'}`);
       }
     } catch (error) {
       console.error('Fehler beim Pausieren/Fortsetzen:', error);
       alert('Fehler beim Ändern des Scheduler-Status');
     } finally {
-      setTogglingScheduler(false);
+      if (env === 'prod') {
+        setTogglingSchedulerProd(false);
+      } else {
+        setTogglingSchedulerTest(false);
+      }
     }
   };
 
@@ -379,24 +398,24 @@ export default function Dashboard() {
               </select>
             </div>
 
-            {/* Pause/Resume Button */}
+            {/* Pause/Resume Button (abhängig vom aktuellen Environment) */}
             <div className="relative group flex flex-col gap-1">
-              <label className="text-xs text-gray-600 font-medium">Status</label>
+              <label className="text-xs text-gray-600 font-medium">Status ({environment.toUpperCase()})</label>
               <button
                 onClick={toggleScheduler}
-                disabled={togglingScheduler}
+                disabled={environment === 'prod' ? togglingSchedulerProd : togglingSchedulerTest}
                 className={`px-6 py-2.5 rounded-lg font-semibold text-white transition-all duration-200 flex items-center gap-2 ${
-                  schedulerPaused 
+                  (environment === 'prod' ? schedulerPausedProd : schedulerPausedTest)
                     ? 'bg-green-600 hover:bg-green-700' 
                     : 'bg-red-600 hover:bg-red-700'
-                } ${togglingScheduler ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
+                } ${(environment === 'prod' ? togglingSchedulerProd : togglingSchedulerTest) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}`}
               >
-                {togglingScheduler ? (
+                {(environment === 'prod' ? togglingSchedulerProd : togglingSchedulerTest) ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     <span>Ändern...</span>
                   </>
-                ) : schedulerPaused ? (
+                ) : (environment === 'prod' ? schedulerPausedProd : schedulerPausedTest) ? (
                   <>
                     <span>▶️</span>
                     <span>Fortsetzen</span>
@@ -412,10 +431,10 @@ export default function Dashboard() {
               {/* Custom Tooltip */}
               <div className="absolute right-0 top-full mt-2 w-80 bg-gray-900 text-white text-sm rounded-lg p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
                 <div className="font-bold mb-2">
-                  {schedulerPaused ? '▶️ Tests fortsetzen' : '⏸️ Automatische Tests pausieren'}
+                  {(environment === 'prod' ? schedulerPausedProd : schedulerPausedTest) ? '▶️ Tests fortsetzen' : '⏸️ Automatische Tests pausieren'} ({environment.toUpperCase()})
                 </div>
                 <div className="text-gray-300 space-y-1">
-                  {schedulerPaused ? (
+                  {(environment === 'prod' ? schedulerPausedProd : schedulerPausedTest) ? (
                     <>
                       <p>• Automatische Tests laufen wieder alle <strong>{formatInterval(schedulerInterval)}</strong></p>
                       <p>• 24/7 Monitoring wird fortgesetzt</p>
@@ -787,6 +806,15 @@ export default function Dashboard() {
         <p>
           <span className="font-semibold text-gray-700">Testimate</span> • CHECK24 Login Testing System • 
           Automatische Tests alle {formatInterval(schedulerInterval)}
+        </p>
+        <p className="mt-2 flex items-center justify-center gap-4">
+          <span className={schedulerPausedProd ? 'text-red-600 font-medium' : 'text-green-600 font-medium'}>
+            PROD: {schedulerPausedProd ? '⏸️ Pausiert' : '▶️ Aktiv'}
+          </span>
+          <span className="text-gray-300">•</span>
+          <span className={schedulerPausedTest ? 'text-red-600 font-medium' : 'text-green-600 font-medium'}>
+            TEST: {schedulerPausedTest ? '⏸️ Pausiert' : '▶️ Aktiv'}
+          </span>
         </p>
       </footer>
     </div>
