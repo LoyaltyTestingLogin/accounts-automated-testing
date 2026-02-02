@@ -15,8 +15,8 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     id: 'login-happy',
     name: 'Login - Passwort Login inklusive Login Challenge',
     path: 'tests/login/password-happy-path.spec.ts',
-    description: 'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
-    testCount: 3,
+    description: 'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)\n\n• Test 4: Combined Account with 2FA enabled (Keine Login Challenge)',
+    testCount: 4,
   },
   {
     id: 'login-otp',
@@ -29,8 +29,8 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     id: 'login-password-reset',
     name: 'Login - Passwort Reset',
     path: 'tests/login/password-reset.spec.ts',
-    description: 'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)',
-    testCount: 3,
+    description: 'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)\n\n• Test 4: Combined Account mit 2FA (Doppel-TAN: Email + SMS, kein Passwort-Änderung)',
+    testCount: 4,
   },
   {
     id: 'login-passkey',
@@ -48,9 +48,9 @@ export const TEST_SUITES: TestSuiteConfig[] = [
   },
   {
     id: 'registration-phone',
-    name: 'Registrierung - Telefon Registrierung',
+    name: 'Registrierung - Phone Registrierung',
     path: 'tests/registration/phone-registrierung-happy-path.spec.ts',
-    description: 'Vollständiger Telefon-Registrierungs-Flow\n\n• Telefonnummer eingeben\n\n• Passwort wählen (optional)\n\n• TAN-Verifizierung per SMS\n\n• Registrierung abschließen',
+    description: 'Vollständiger Phone-Registrierungs-Flow\n\n• Phone eingeben\n\n• Passwort wählen (optional)\n\n• TAN-Verifizierung per SMS\n\n• Registrierung abschließen',
     testCount: 1,
   },
 ];

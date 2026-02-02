@@ -249,12 +249,12 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
     // Warte auf mögliche Weiterleitung oder Phone Collector Screen
     await page.waitForTimeout(2000);
 
-    // Telefonnummer-Screen überspringen falls vorhanden (analog zu password-happy-path)
-    console.log('🔍 Prüfe auf Telefonnummer-Screen (Phone Collector)...');
+    // Phone-Screen überspringen falls vorhanden (analog zu password-happy-path)
+    console.log('🔍 Prüfe auf Phone-Screen (Phone Collector)...');
     const bodyText = await page.locator('body').textContent() || '';
     
     if (bodyText.toLowerCase().includes('telefonnummer')) {
-      console.log('📱 Telefonnummer-Screen erkannt - klicke "später erinnern"...');
+      console.log('📱 Phone-Screen erkannt - klicke "später erinnern"...');
       
       const laterButtonSelectors = [
         'button:has-text("später")',
@@ -296,7 +296,7 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
         console.log('⚠️  "später erinnern" Button nicht gefunden - fahre trotzdem fort');
       }
     } else {
-      console.log('ℹ️  Kein Telefonnummer-Screen erkannt');
+      console.log('ℹ️  Kein Phone-Screen erkannt');
     }
 
     // Warte auf Weiterleitung zum Kundenbereich
@@ -325,11 +325,11 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
     const page = await context.newPage();
     
     try {
-      // Account mit E-Mail + Telefon verwenden
+      // Account mit E-Mail + Phone verwenden
       const credentials = getAccountCredentials('EMAIL_PHONE');
       console.log(`📧📱 Verwende Test-Account: ${credentials.account.description}`);
       console.log(`📧 E-Mail: ${credentials.account.email}`);
-      console.log(`📱 Telefon: ${credentials.account.phone}`);
+      console.log(`📱 Phone: ${credentials.account.phone}`);
 
       // OTP-Login starten
       await startOtpLogin(page, credentials.email);
@@ -409,11 +409,11 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
     const page = await context.newPage();
     
     try {
-      // Account mit E-Mail + Telefon verwenden
+      // Account mit E-Mail + Phone verwenden
       const credentials = getAccountCredentials('EMAIL_PHONE');
       console.log(`📧📱 Verwende Test-Account: ${credentials.account.description}`);
       console.log(`📧 E-Mail: ${credentials.account.email}`);
-      console.log(`📱 Telefon: ${credentials.account.phone}`);
+      console.log(`📱 Phone: ${credentials.account.phone}`);
 
       // OTP-Login starten
       await startOtpLogin(page, credentials.email);

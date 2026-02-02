@@ -48,11 +48,11 @@ test.describe('CHECK24 Login - Happy Path', () => {
     const page = await context.newPage();
     
     try {
-      // Account mit E-Mail + Telefon verwenden
+      // Account mit E-Mail + Phone verwenden
       const credentials = getAccountCredentials('EMAIL_PHONE');
       console.log(`📧📱 Verwende Test-Account: ${credentials.account.description}`);
       console.log(`📧 E-Mail: ${credentials.account.email}`);
-      console.log(`📱 Telefon: ${credentials.account.phone}`);
+      console.log(`📱 Phone: ${credentials.account.phone}`);
 
       // Login durchführen (E-Mail + Passwort)
       const { email } = await loginWithPassword(page, credentials.email, credentials.password);
@@ -90,18 +90,18 @@ test.describe('CHECK24 Login - Happy Path', () => {
     const page = await context.newPage();
     
     try {
-      // Account mit E-Mail + Telefon verwenden
+      // Account mit E-Mail + Phone verwenden
       const credentials = getAccountCredentials('EMAIL_PHONE');
       console.log(`📧📱 Verwende Test-Account: ${credentials.account.description}`);
       console.log(`📧 E-Mail: ${credentials.account.email}`);
-      console.log(`📱 Telefon: ${credentials.account.phone}`);
+      console.log(`📱 Phone: ${credentials.account.phone}`);
 
       // Login durchführen (E-Mail + Passwort)
       const { email } = await loginWithPassword(page, credentials.email, credentials.password);
       console.log(`✅ Login-Daten eingegeben für: ${email}`);
 
       // Login-Challenge behandeln - WICHTIG: Phone-Methode explizit auswählen
-      console.log('📱 Wähle SMS/Telefon als Challenge-Methode...');
+      console.log('📱 Wähle SMS/Phone als Challenge-Methode...');
       
       await page.waitForTimeout(2000);
       
@@ -317,11 +317,11 @@ test.describe('CHECK24 Login - Happy Path', () => {
         
         await page.waitForTimeout(3000);
         
-        // SCHRITT: Telefonnummer-Screen überspringen (falls vorhanden)
+        // SCHRITT: Phone-Screen überspringen (falls vorhanden)
         const bodyTextAfterSMS = await page.locator('body').textContent() || '';
         
         if (bodyTextAfterSMS.toLowerCase().includes('telefonnummer')) {
-          console.log('📱 Telefonnummer-Screen erkannt - klicke "später erinnern"...');
+          console.log('📱 Phone-Screen erkannt - klicke "später erinnern"...');
           
           const laterButtonSelectors = [
             'button:has-text("später")',
@@ -408,6 +408,212 @@ test.describe('CHECK24 Login - Happy Path', () => {
       }
 
       console.log(`✅ Test erfolgreich abgeschlossen für Combined Account (SMS-TAN): ${email}`);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('Erfolgreicher Login - 2FA Account mit SMS-TAN (via iPhone-Weiterleitung)', async ({ browser }) => {
+    // Neuen Browser-Context erstellen (ohne Cookies)
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    
+    try {
+      // Account mit E-Mail + Phone + 2FA verwenden
+      const credentials = getAccountCredentials('EMAIL_PHONE_2FA');
+      console.log(`🔐 Verwende Test-Account: ${credentials.account.description}`);
+      console.log(`📧 E-Mail: ${credentials.account.email}`);
+      console.log(`📱 Phone: ${credentials.account.phone}`);
+      console.log(`🔒 2FA aktiviert: Ja`);
+
+      // Login durchführen (E-Mail + Passwort)
+      const { email } = await loginWithPassword(page, credentials.email, credentials.password);
+      console.log(`✅ Login-Daten eingegeben für: ${email}`);
+
+      // Warte kurz auf 2FA-Screen
+      console.log('⏳ Warte auf 2FA-Abfrage...');
+      await page.waitForTimeout(3000);
+
+      // Debug: Zeige aktuellen Screen
+      const currentUrl = page.url();
+      const currentTitle = await page.title();
+      console.log(`📍 URL nach Login: ${currentUrl}`);
+      console.log(`📄 Titel: ${currentTitle}`);
+
+      // Prüfe auf 2FA-Screen
+      const bodyText = await page.locator('body').textContent() || '';
+      const has2FA = bodyText.toLowerCase().includes('zwei-faktor') || 
+                     bodyText.toLowerCase().includes('sicherheit') ||
+                     bodyText.toLowerCase().includes('bestätigung');
+
+      if (has2FA) {
+        console.log('✅ 2FA-Screen erkannt');
+
+        // 2FA SMS wird automatisch versendet - warte auf Eingabefelder
+        console.log('⏳ Warte auf 2FA-Code-Eingabefelder (6 separate Felder)...');
+        await page.waitForTimeout(2000);
+
+        // CHECK24 verwendet 6 separate Input-Felder für den 6-stelligen Code
+        // Filtere nur die sichtbaren Felder
+        const allCodeFields = page.locator('input[type="text"][placeholder=" "]');
+        const allFieldsCount = await allCodeFields.count();
+        
+        // Filtere nach sichtbaren Feldern
+        const visibleFields = [];
+        for (let i = 0; i < allFieldsCount; i++) {
+          const field = allCodeFields.nth(i);
+          try {
+            if (await field.isVisible({ timeout: 100 })) {
+              visibleFields.push(field);
+            }
+          } catch (e) {
+            // Nicht sichtbar
+          }
+        }
+        
+        if (visibleFields.length !== 6) {
+          throw new Error(`Erwartet 6 sichtbare Code-Eingabefelder, aber ${visibleFields.length} gefunden`);
+        }
+        
+        console.log('✅ 6 separate 2FA-Code-Eingabefelder gefunden');
+
+        // Hole 2FA-Code aus weitergeleiteter SMS-Email (vom iPhone-Kurzbefehl)
+        console.log('📧 Warte auf weitergeleitete 2FA-SMS von ulitesting@icloud.com...');
+        console.log(`📱 SMS wird an ${credentials.account.twoFactorPhone || credentials.account.phone} gesendet`);
+
+        const { getEmailClient } = await import('../helpers/email.js');
+        const emailClient = getEmailClient();
+
+        // Warte auf Email von iPhone-Kurzbefehl (Absender: ulitesting@icloud.com)
+        let smsEmail;
+        try {
+          smsEmail = await emailClient.waitForEmail(
+            {
+              from: 'ulitesting@icloud.com', // iPhone-Kurzbefehl sendet von hier
+            },
+            120000, // 2 Minuten Timeout
+            3000
+          );
+        } catch (error) {
+          await sendEmailTimeoutWarning(
+            'Password Login 2FA - TAN-Code',
+            'from: ulitesting@icloud.com',
+            120
+          );
+          throw error;
+        }
+
+        if (!smsEmail) {
+          throw new Error('2FA-SMS-Weiterleitungs-Email vom iPhone nicht erhalten (Timeout nach 2 Minuten)');
+        }
+
+        console.log(`✅ 2FA-SMS-Email erhalten von: ${smsEmail.from}`);
+        console.log(`📧 Betreff: ${smsEmail.subject}`);
+
+        // Extrahiere 2FA-Code aus der Email
+        const twoFactorCode = emailClient.extractTanCode(smsEmail);
+
+        if (!twoFactorCode) {
+          throw new Error('2FA-Code konnte nicht aus weitergeleiteter Email extrahiert werden');
+        }
+
+        console.log(`🔑 2FA-Code erhalten: ${twoFactorCode}`);
+
+        // Prüfe dass der Code 6 Ziffern hat
+        if (twoFactorCode.length !== 6) {
+          throw new Error(`2FA-Code muss 6 Ziffern haben, aber hat ${twoFactorCode.length}: ${twoFactorCode}`);
+        }
+
+        // 2FA-Code eingeben - jede Ziffer in ein separates Feld
+        console.log('⌨️  Gebe 2FA-Code ein (Ziffer für Ziffer)...');
+        await page.waitForTimeout(500);
+
+        for (let i = 0; i < 6; i++) {
+          const digit = twoFactorCode[i];
+          const field = visibleFields[i];
+          
+          try {
+            await field.fill(digit);
+            console.log(`  ✓ Ziffer ${i + 1}/6 eingegeben: ${digit}`);
+            await page.waitForTimeout(100); // Kurze Pause zwischen Ziffern
+          } catch (fillError) {
+            // JavaScript-Fallback
+            console.log(`  ⚠️  Ziffer ${i + 1} fill() fehlgeschlagen, versuche JavaScript...`);
+            await field.evaluate((el: any, d: string) => {
+              el.value = d;
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, digit);
+            console.log(`  ✓ Ziffer ${i + 1}/6 eingegeben (JavaScript): ${digit}`);
+          }
+        }
+
+        console.log('✅ 2FA-Code vollständig eingegeben');
+        await page.waitForTimeout(1000);
+
+        // Login sollte automatisch abgeschickt werden, aber versuche trotzdem Enter
+        console.log('➡️  Schließe 2FA-Login ab...');
+
+        try {
+          // Versuche Enter im letzten Feld
+          await visibleFields[5].press('Enter');
+          console.log('✅ Enter gedrückt');
+        } catch (enterError) {
+          // Button-Fallback
+          const submitButton = page.locator('button[type="submit"], button:has-text("Weiter"), button:has-text("Bestätigen")').first();
+          if (await submitButton.count() > 0) {
+            await submitButton.click({ force: true });
+            console.log('✅ Submit-Button geklickt');
+          } else {
+            console.log('ℹ️  Kein Submit-Button gefunden, Login sollte automatisch erfolgen');
+          }
+        }
+
+        await page.waitForTimeout(3000);
+
+        // Login-Erfolg verifizieren mit c24session Cookie
+        console.log('🔍 Prüfe Login-Erfolg mit c24session Cookie...');
+
+        const cookies = await page.context().cookies();
+        const c24sessionCookie = cookies.find(cookie => cookie.name === 'c24session');
+
+        if (c24sessionCookie) {
+          console.log(`✅ c24session Cookie gefunden: ${c24sessionCookie.value.substring(0, 20)}...`);
+          console.log(`   Domain: ${c24sessionCookie.domain}`);
+          console.log(`   Expires: ${c24sessionCookie.expires ? new Date(c24sessionCookie.expires * 1000).toISOString() : 'Session'}`);
+        } else {
+          console.log('⚠️  c24session Cookie NICHT gefunden - Login möglicherweise fehlgeschlagen');
+          console.log('📋 Vorhandene Cookies:', cookies.map(c => c.name).join(', '));
+          throw new Error('2FA-Login nicht vollständig: c24session Cookie fehlt');
+        }
+
+        const finalUrl = page.url();
+        console.log(`📍 Finale URL: ${finalUrl}`);
+
+        // Prüfe ob wir auf Kundenbereich sind
+        if (finalUrl.includes('kundenbereich.check24.de')) {
+          console.log('✅ Erfolgreich auf Kundenbereich weitergeleitet');
+        } else if (finalUrl.includes('process=failed')) {
+          throw new Error('2FA-Login fehlgeschlagen: URL zeigt process=failed');
+        }
+
+        console.log('✅ Login vollständig erfolgreich mit 2FA (via iPhone-Weiterleitung)');
+
+        // Screenshot vom erfolgreichen Login
+        await page.screenshot({
+          path: `test-results/screenshots/2fa-login-success-${Date.now()}.png`,
+          fullPage: true
+        });
+
+        // Logout
+        const { logout } = await import('../helpers/auth.js');
+        await logout(page);
+      } else {
+        console.log('ℹ️  Keine 2FA-Abfrage erkannt');
+        throw new Error('2FA-Abfrage wurde nicht angezeigt - Test fehlgeschlagen');
+      }
+
+      console.log(`✅ Test erfolgreich abgeschlossen für 2FA Account: ${email}`);
     } finally {
       await context.close();
     }

@@ -196,7 +196,7 @@ export async function selectChallengeMethod(page: Page, method: 'email' | 'phone
     return;
   }
   
-  console.log(`✅ Selection Screen erkannt - prüfe ${method === 'email' ? 'E-Mail' : 'Telefonnummer'}-Option`);
+  console.log(`✅ Selection Screen erkannt - prüfe ${method === 'email' ? 'E-Mail' : 'Phone'}-Option`);
   
   // SCHRITT 1: Prüfe ob die gewünschte Option bereits ausgewählt ist (Radio Button checked)
   const radioSelectors = method === 'email'
@@ -254,7 +254,7 @@ export async function selectChallengeMethod(page: Page, method: 'email' | 'phone
         'input[type="radio"][value*="phone"]',
         'label:has-text("per SMS")',
         'button:has-text("SMS")',
-        'button:has-text("Telefon")',
+        'button:has-text("Phone")',
         'a:has-text("SMS")',
         '[data-testid*="sms"]',
         '[data-testid*="phone"]',
@@ -743,7 +743,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
 
   console.log('✅ Login-Challenge abgeschlossen');
   
-  // SCHRITT 7: Telefonnummer-Hinterlegungs-Screen überspringen (falls vorhanden)
+  // SCHRITT 7: Phone-Hinterlegungs-Screen überspringen (falls vorhanden)
   await page.waitForTimeout(3000);
   
   console.log('🔍 Analysiere Seite nach Login-Challenge...');
@@ -765,7 +765,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
     console.log(`   ${i + 1}. "${btnText?.trim()}" (type: ${btnType})`);
   }
   
-  // Prüfe auf Telefonnummer-Screen (case-insensitive)
+  // Prüfe auf Phone-Screen (case-insensitive)
   const phoneScreenPatterns = [
     /telefonnummer/i,
     /handynummer/i,
@@ -778,7 +778,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   let phoneScreenFound = false;
   for (const pattern of phoneScreenPatterns) {
     if (bodyText && pattern.test(bodyText)) {
-      console.log(`✅ Telefonnummer-Screen erkannt: Pattern matched "${pattern}"`);
+      console.log(`✅ Phone-Screen erkannt: Pattern matched "${pattern}"`);
       phoneScreenFound = true;
       break;
     }
@@ -857,7 +857,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
         fullPage: true 
       });
     } else {
-      console.log('✅ Telefonnummer-Screen übersprungen');
+      console.log('✅ Phone-Screen übersprungen');
       
       // Warte auf Navigation
       await page.waitForTimeout(2000);
@@ -865,7 +865,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
       console.log(`📍 Neue URL nach Skip: ${newUrl}`);
     }
   } else {
-    console.log('ℹ️  Kein Telefonnummer-Screen erkannt - überspringe');
+    console.log('ℹ️  Kein Phone-Screen erkannt - überspringe');
   }
   
   return true;

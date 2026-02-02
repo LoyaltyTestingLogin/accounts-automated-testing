@@ -400,8 +400,8 @@ export class SlackNotifier {
         'Vollständiger Passwort-Reset Flow mit TAN-Verifizierung\n\n• Test 1: E-Mail only Account (TAN per E-Mail + Phone Collector)\n• Test 2: Combined Account (TAN per E-Mail)\n• Test 3: Combined Account (TAN per SMS)',
       'Registrierung - E-Mail Registrierung': 
         'Vollständiger E-Mail-Registrierungs-Flow\n\n• E-Mail eingeben\n• Passwort wählen\n• TAN-Verifizierung per E-Mail\n• Registrierung abschließen\n• Konto automatisch löschen',
-      'Registrierung - Telefon Registrierung': 
-        'Vollständiger Telefon-Registrierungs-Flow\n\n• Telefonnummer eingeben\n• E-Mail & Passwort wählen\n• TAN-Verifizierung per E-Mail\n• TAN-Verifizierung per SMS\n• Registrierung abschließen\n• Konto automatisch löschen',
+      'Registrierung - Phone Registrierung': 
+        'Vollständiger Phone-Registrierungs-Flow\n\n• Phone eingeben\n• E-Mail & Passwort wählen\n• TAN-Verifizierung per E-Mail\n• TAN-Verifizierung per SMS\n• Registrierung abschließen\n• Konto automatisch löschen',
     };
     
     return descriptions[testName] || null;

@@ -7,19 +7,19 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * CHECK24 Registrierung - Telefon Happy Path Tests
+ * CHECK24 Registrierung - Phone Happy Path Tests
  * 
- * Testet den vollständigen Registrierungs-Flow mit Telefonnummer
+ * Testet den vollständigen Registrierungs-Flow mit Phone
  */
 
-test.describe('CHECK24 Registrierung - Telefon Happy Path', () => {
+test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
 
-  test('Erfolgreiche Telefon-Registrierung', async ({ browser }) => {
+  test('Erfolgreiche Phone-Registrierung', async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     
     try {
-      console.log('📱 Starte Telefon-Registrierung...');
+      console.log('📱 Starte Phone-Registrierung...');
 
       // Zur Login/Registrierungs-Seite navigieren
       const baseUrl = process.env.CHECK24_BASE_URL;
@@ -29,14 +29,14 @@ test.describe('CHECK24 Registrierung - Telefon Happy Path', () => {
       await page.goto(baseUrl);
       await page.waitForLoadState('networkidle');
 
-      // SCHRITT 1: Generiere eindeutige Telefonnummer mit aktueller Uhrzeit
+      // SCHRITT 1: Generiere eindeutige Phone mit aktueller Uhrzeit
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const timeExtension = hours + minutes; // z.B. "1430" für 14:30
       const phoneNumber = `01746760225 ext. ${timeExtension}`;
       
-      console.log(`📱 SCHRITT 1: Gebe Telefonnummer ein: ${phoneNumber}`);
+      console.log(`📱 SCHRITT 1: Gebe Phone ein: ${phoneNumber}`);
       const phoneInput = page.locator('#cl_login');
       await phoneInput.waitFor({ state: 'visible', timeout: 10000 });
       await page.waitForTimeout(300);
@@ -289,7 +289,7 @@ test.describe('CHECK24 Registrierung - Telefon Happy Path', () => {
         return null;
       });
 
-      console.log(`✅ Telefon-Registrierung vollständig erfolgreich für: ${phoneNumber} / ${email}`);
+      console.log(`✅ Phone-Registrierung vollständig erfolgreich für: ${phoneNumber} / ${email}`);
 
       // SCHRITT 12: Konto wieder löschen (parallel zur Willkommensmail-Prüfung)
       console.log('🗑️  SCHRITT 12: Lösche das neu erstellte Konto (parallel zur Willkommensmail-Prüfung)...');

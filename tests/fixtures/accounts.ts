@@ -7,12 +7,19 @@
  * WICHTIG: Login Challenge ≠ 2FA
  * - Login Challenge: Sicherheitsprüfung bei unbekanntem Gerät/Inkognito (kommt immer)
  * - 2FA: Zwei-Faktor-Authentifizierung (nur wenn in Account-Einstellungen aktiviert)
+ * 
+ * PASSWORT: Alle Test-Accounts nutzen das gleiche Passwort (TEST_PASSWORD in .env)
  */
+
+/**
+ * Zentrales Test-Passwort für alle Accounts
+ */
+export const TEST_PASSWORD = '1qay1qay';
 
 export type AccountFeature = 
   | 'email'           // Hat nur E-Mail hinterlegt
-  | 'phone'           // Hat nur Telefon hinterlegt
-  | 'email_phone'     // Hat E-Mail und Telefon hinterlegt
+  | 'phone'           // Hat nur Phone hinterlegt
+  | 'email_phone'     // Hat E-Mail und Phone hinterlegt
   | 'two_factor'      // 2FA in Account-Einstellungen aktiviert (optional)
   | 'login_challenge' // Login Challenge bei unbekanntem Gerät (kommt standardmäßig immer)
   | 'verified'        // Account ist verifiziert
@@ -21,10 +28,10 @@ export type AccountFeature =
 export interface TestAccount {
   id: string;                    // Eindeutige ID für den Account
   email: string;                 // E-Mail-Adresse
-  passwordEnvKey: string;        // Key für Passwort in .env
   features: AccountFeature[];    // Eigenschaften des Accounts
   description: string;           // Beschreibung für was der Account genutzt wird
-  phone?: string;                // Telefonnummer (optional)
+  phone?: string;                // Phone (optional)
+  twoFactorPhone?: string;       // 2FA Phone (optional, falls abweichend von phone)
 }
 
 /**
@@ -35,24 +42,28 @@ export const TEST_ACCOUNTS: Record<string, TestAccount> = {
   EMAIL_ONLY: {
     id: 'email_only',
     email: 'loyaltytesting+automatedtesting1@check24.de',
-    passwordEnvKey: 'TEST_PASSWORD_ACCOUNT_1',
     features: ['email', 'login_challenge', 'verified'],
     description: 'Account mit nur E-Mail-Adresse, Login Challenge (TAN per E-Mail bei unbekanntem Gerät)',
   },
 
-  // Account 2: E-Mail + Telefon, Login Challenge (kein 2FA in Einstellungen)
+  // Account 2: E-Mail + Phone, Login Challenge (kein 2FA in Einstellungen)
   EMAIL_PHONE: {
     id: 'email_phone',
     email: 'loyaltytesting+automatedtestingcombinedaccount@check24.de',
-    passwordEnvKey: 'TEST_PASSWORD_ACCOUNT_2',
     features: ['email', 'phone', 'email_phone', 'login_challenge', 'verified'],
-    description: 'Account mit E-Mail und Telefon, Login Challenge (TAN per E-Mail oder SMS bei unbekanntem Gerät)',
+    description: 'Account mit E-Mail und Phone, Login Challenge (TAN per E-Mail oder SMS bei unbekanntem Gerät)',
     phone: '01746760225 ext. 8520',
   },
 
-  // Weitere Accounts können hier einfach hinzugefügt werden:
-  // EMAIL_ONLY_WITH_2FA: { features: ['email', 'two_factor', 'login_challenge'] },
-  // etc.
+  // Account 3: E-Mail + Phone + 2FA aktiviert
+  EMAIL_PHONE_2FA: {
+    id: 'email_phone_2fa',
+    email: 'loyaltytesting+automatedtestingcombinedaccountwith2fa@check24.de',
+    features: ['email', 'phone', 'email_phone', 'two_factor', 'login_challenge', 'verified'],
+    description: 'Account mit E-Mail, Phone und aktiviertem 2FA (Zwei-Faktor-Authentifizierung)',
+    phone: '01746760225 ext. 8521',
+    twoFactorPhone: '01746760225 ext. 8521', // Gleiche Nummer für 2FA
+  },
 };
 
 /**
@@ -67,17 +78,10 @@ export function getAccount(accountId: keyof typeof TEST_ACCOUNTS): TestAccount {
 }
 
 /**
- * Helper: Account-Passwort aus Environment abrufen
+ * Helper: Account-Passwort abrufen (alle Accounts nutzen TEST_PASSWORD)
  */
-export function getAccountPassword(account: TestAccount): string {
-  const password = process.env[account.passwordEnvKey];
-  if (!password) {
-    throw new Error(
-      `Passwort für Account "${account.id}" nicht gefunden. ` +
-      `Bitte ${account.passwordEnvKey} in .env setzen.`
-    );
-  }
-  return password;
+export function getAccountPassword(account?: TestAccount): string {
+  return TEST_PASSWORD;
 }
 
 /**
@@ -119,19 +123,12 @@ export function getAccountCredentials(accountId: keyof typeof TEST_ACCOUNTS): Ac
 }
 
 /**
- * Validierung: Prüft ob alle Account-Passwörter in .env definiert sind
+ * Validierung: Prüft ob die Account-Konfiguration valide ist
  */
 export function validateAccountsConfiguration(): { valid: boolean; missing: string[] } {
-  const missing: string[] = [];
-  
-  for (const account of Object.values(TEST_ACCOUNTS)) {
-    if (!process.env[account.passwordEnvKey]) {
-      missing.push(account.passwordEnvKey);
-    }
-  }
-  
+  // Passwort ist jetzt hardcoded in accounts.ts, keine Validierung nötig
   return {
-    valid: missing.length === 0,
-    missing,
+    valid: true,
+    missing: [],
   };
 }
