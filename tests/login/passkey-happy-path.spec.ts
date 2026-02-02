@@ -15,7 +15,7 @@ const execAsync = promisify(exec);
  */
 
 test.describe('CHECK24 Login - Passkey', () => {
-  test('Passkey Login - Happy Path', async () => {
+  test('Test Case 1: Passkey Login über Passkey-Button', async () => {
     console.log('\n🔐 Starte Passkey Login Happy Path...\n');
 
     // Verwende echtes Chrome mit frischem Test-Profil
@@ -74,7 +74,7 @@ test.describe('CHECK24 Login - Passkey', () => {
       
       console.log('🍎 Automatisiere nativen Passkey-Dialog (AuthenticationServicesAgent)...');
       
-      const password = 'Ch12LoRoSTART';
+      const password = '1qay1qay';
       
       // Komplettes AppleScript für alle 3 Schritte mit Fokus auf den richtigen Dialog
       const appleScriptComplete = `
@@ -161,6 +161,167 @@ test.describe('CHECK24 Login - Passkey', () => {
         } else {
           console.log('❌ Login fehlgeschlagen - Cookie auch nach Wartezeit nicht vorhanden');
           throw new Error('Passkey-Login fehlgeschlagen: c24session Cookie nicht gefunden');
+        }
+      }
+      
+    } finally {
+      // Browser schließen
+      await browser.close();
+      console.log('\n✅ Test abgeschlossen\n');
+    }
+  });
+
+  test('Test Case 2: Passkey Login über Conditional UI (Email-Feld)', async () => {
+    console.log('\n🔐 Starte Passkey Login via Conditional UI...\n');
+
+    // Verwende echtes Chrome mit frischem Test-Profil
+    const testProfilePath = path.join(os.tmpdir(), 'chrome-passkey-conditional-' + Date.now());
+    
+    console.log('📁 Chrome Test-Profil:', testProfilePath);
+
+    const browser = await chromium.launchPersistentContext(testProfilePath, {
+      headless: false,
+      channel: 'chrome',
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--no-first-run',
+        '--no-default-browser-check',
+      ],
+    });
+
+    const page = await browser.newPage();
+
+    try {
+      // 1. Zur Login-Seite navigieren
+      const baseUrl = process.env.CHECK24_BASE_URL || 'https://accounts.check24.com';
+      const loginUrl = `${baseUrl}/login?redirect_uri=https://kundenbereich.check24.de`;
+      
+      console.log('📍 Navigiere zu:', loginUrl);
+      await page.goto(loginUrl);
+      await page.waitForLoadState('networkidle');
+
+      // 2. Auf Email-Inputfeld klicken (löst Conditional UI aus)
+      console.log('🖱️  Klicke auf Email-Inputfeld...');
+      const emailInput = page.locator('#cl_login');
+      await emailInput.click();
+      
+      console.log('⏳ Warte 2 Sekunden auf Passkey-Vorschlag (Conditional UI)...');
+      await page.waitForTimeout(2000);
+      
+      // 3. Passkey-Vorschlag mit AppleScript auswählen
+      console.log('🍎 Automatisiere Passkey-Auswahl mit AppleScript...');
+      
+      const appleScriptSelectPasskey = `
+        tell application "System Events"
+          -- Pfeil-Runter zum Auswählen
+          keystroke (ASCII character 31)
+          delay 0.5
+          -- Enter zum Bestätigen
+          keystroke return
+        end tell
+      `;
+      
+      console.log('   → Drücke Pfeil-Runter (Passkey auswählen)...');
+      console.log('   → Drücke Enter (Passkey bestätigen)...');
+      
+      try {
+        await execAsync(`osascript -e '${appleScriptSelectPasskey}'`);
+        console.log('   ✅ Passkey-Auswahl abgeschlossen');
+      } catch (error) {
+        console.log('   ⚠️  Fehler bei Passkey-Auswahl:', (error as Error).message.split('\n')[0]);
+      }
+      
+      // 4. Nativer Passkey-Dialog automatisieren: Enter → Passwort → Enter
+      console.log('⏳ Warte 2 Sekunden auf nativen Passkey-Dialog...');
+      await page.waitForTimeout(2000);
+      
+      console.log('🍎 Automatisiere nativen Passkey-Dialog...');
+      
+      const password = '1qay1qay';
+      
+      const appleScriptComplete = `
+        tell application "System Events"
+          -- Schritt 1: Enter drücken (Fortfahren)
+          keystroke return
+          delay 1.5
+          
+          -- Schritt 2: Passwort eingeben
+          keystroke "${password}"
+          delay 0.5
+          
+          -- Schritt 3: Enter drücken (Bestätigen)
+          keystroke return
+        end tell
+      `;
+      
+      console.log('   🔄 Führe kompletten Dialog-Flow aus...');
+      console.log('      1. Enter (Fortfahren)');
+      console.log('      2. Passwort eingeben');
+      console.log('      3. Enter (Bestätigen)');
+      
+      try {
+        await execAsync(`osascript -e '${appleScriptComplete}'`);
+        console.log('   ✅ Dialog-Automatisierung abgeschlossen');
+      } catch (error) {
+        console.log('   ⚠️  Fehler bei Dialog-Automatisierung:', (error as Error).message.split('\n')[0]);
+      }
+      
+      // Warte zusätzlich 2 Sekunden für Verarbeitung
+      await page.waitForTimeout(2000);
+      
+      // 5. Warte auf Weiterleitung zur Kundenbereich-Seite
+      console.log('⏳ Warte auf Weiterleitung zur kundenbereich.check24.de...');
+      
+      try {
+        await page.waitForURL('**/kundenbereich.check24.de/**', { timeout: 15000 });
+        console.log('✅✅✅ LOGIN ERFOLGREICH - Weitergeleitet! ✅✅✅');
+      } catch (error) {
+        console.log('⚠️  Keine automatische Weiterleitung innerhalb 15 Sekunden');
+        const currentUrl = page.url();
+        console.log('📍 Aktuelle URL:', currentUrl);
+        
+        if (currentUrl.includes('kundenbereich')) {
+          console.log('✅ URL enthält "kundenbereich" - Login vermutlich erfolgreich!');
+        }
+      }
+      
+      // 6. c24session Cookie prüfen
+      console.log('🍪 Prüfe c24session Cookie...');
+      const cookies = await page.context().cookies();
+      const c24session = cookies.find(c => c.name === 'c24session');
+      
+      if (c24session) {
+        console.log('✅✅✅ c24session Cookie gefunden! LOGIN ERFOLGREICH! ✅✅✅');
+        console.log('   Domain:', c24session.domain);
+        console.log('   Wert (erste 20 Zeichen):', c24session.value.substring(0, 20) + '...');
+        
+        expect(c24session).toBeTruthy();
+        expect(c24session.value).toBeTruthy();
+        expect(c24session.value.length).toBeGreaterThan(0);
+        
+        console.log('\n🎉 Passkey-Login via Conditional UI erfolgreich!\n');
+      } else {
+        console.log('❌ c24session Cookie NICHT gefunden');
+        console.log('Verfügbare Cookies:', cookies.map(c => c.name));
+        console.log('\n⚠️  Mögliche Gründe:');
+        console.log('   1. Conditional UI hat keinen Passkey-Vorschlag angezeigt');
+        console.log('   2. Passkey-Dialog wurde nicht automatisiert');
+        console.log('   3. Dialog erfordert manuelle Bestätigung');
+        
+        // Gebe dem Nutzer 15 Sekunden Zeit zur manuellen Bestätigung
+        console.log('\n⏳ Warte 15 Sekunden für manuelle Bestätigung...\n');
+        await page.waitForTimeout(15000);
+        
+        // Prüfe erneut
+        const cookiesAfterWait = await page.context().cookies();
+        const c24sessionAfterWait = cookiesAfterWait.find(c => c.name === 'c24session');
+        
+        if (c24sessionAfterWait) {
+          console.log('✅ c24session nach manueller Bestätigung gefunden!');
+          expect(c24sessionAfterWait.value).toBeTruthy();
+        } else {
+          console.log('❌ Login fehlgeschlagen - Cookie auch nach Wartezeit nicht vorhanden');
+          throw new Error('Passkey-Login (Conditional UI) fehlgeschlagen: c24session Cookie nicht gefunden');
         }
       }
       
