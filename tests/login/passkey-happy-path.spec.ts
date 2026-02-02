@@ -69,32 +69,36 @@ test.describe('CHECK24 Login - Passkey', () => {
       await passkeyButton.click();
       
       // 5. Nativer Passkey-Dialog automatisieren: Enter → Passwort → Enter
-      console.log('⏳ Warte 2 Sekunden auf nativen Dialog...');
-      await page.waitForTimeout(2000);
+      console.log('⏳ Warte 3 Sekunden auf nativen Dialog...');
+      await page.waitForTimeout(3000);
       
       console.log('🍎 Automatisiere nativen Passkey-Dialog (AuthenticationServicesAgent)...');
       
       const password = '1qay1qay';
       
-      // Komplettes AppleScript für alle 3 Schritte mit Fokus auf den richtigen Dialog
+      // Robustes AppleScript mit Dialog-Aktivierung und mehreren Versuchen
       const appleScriptComplete = `
         tell application "System Events"
+          -- Warte kurz damit Dialog vollständig geladen ist
+          delay 0.5
+          
           -- Schritt 1: Enter drücken (Fortfahren)
           keystroke return
-          delay 1.5
+          delay 2.0
           
-          -- Schritt 2: Passwort eingeben
+          -- Schritt 2: Passwort eingeben (mit längerer Wartezeit)
           keystroke "${password}"
-          delay 0.5
+          delay 1.0
           
           -- Schritt 3: Enter drücken (Bestätigen)
           keystroke return
+          delay 0.5
         end tell
       `;
       
       console.log('   🔄 Führe kompletten Dialog-Flow aus...');
-      console.log('      1. Enter (Fortfahren)');
-      console.log('      2. Passwort eingeben');
+      console.log('      1. Enter (Fortfahren) - Wartezeit: 2.0s');
+      console.log('      2. Passwort eingeben - Wartezeit: 1.0s');
       console.log('      3. Enter (Bestätigen)');
       
       try {
@@ -102,10 +106,29 @@ test.describe('CHECK24 Login - Passkey', () => {
         console.log('   ✅ Dialog-Automatisierung abgeschlossen');
       } catch (error) {
         console.log('   ⚠️  Fehler bei Dialog-Automatisierung:', (error as Error).message.split('\n')[0]);
+        
+        // Fallback: Versuche nochmal mit längeren Delays
+        console.log('   🔄 Versuche Fallback mit längeren Wartezeiten...');
+        const fallbackScript = `
+          tell application "System Events"
+            delay 1.0
+            keystroke return
+            delay 3.0
+            keystroke "${password}"
+            delay 1.5
+            keystroke return
+          end tell
+        `;
+        try {
+          await execAsync(`osascript -e '${fallbackScript}'`);
+          console.log('   ✅ Fallback erfolgreich');
+        } catch (fallbackError) {
+          console.log('   ⚠️  Auch Fallback fehlgeschlagen');
+        }
       }
       
-      // Warte zusätzlich 2 Sekunden für Verarbeitung
-      await page.waitForTimeout(2000);
+      // Warte zusätzlich 3 Sekunden für Verarbeitung
+      await page.waitForTimeout(3000);
       
       // 6. Warte auf Weiterleitung zur Kundenbereich-Seite
       console.log('⏳ Warte auf Weiterleitung zur kundenbereich.check24.de...');
@@ -232,8 +255,8 @@ test.describe('CHECK24 Login - Passkey', () => {
       }
       
       // 4. Nativer Passkey-Dialog automatisieren: Enter → Passwort → Enter
-      console.log('⏳ Warte 2 Sekunden auf nativen Passkey-Dialog...');
-      await page.waitForTimeout(2000);
+      console.log('⏳ Warte 3 Sekunden auf nativen Passkey-Dialog...');
+      await page.waitForTimeout(3000);
       
       console.log('🍎 Automatisiere nativen Passkey-Dialog...');
       
@@ -241,22 +264,26 @@ test.describe('CHECK24 Login - Passkey', () => {
       
       const appleScriptComplete = `
         tell application "System Events"
+          -- Warte kurz damit Dialog vollständig geladen ist
+          delay 0.5
+          
           -- Schritt 1: Enter drücken (Fortfahren)
           keystroke return
-          delay 1.5
+          delay 2.0
           
-          -- Schritt 2: Passwort eingeben
+          -- Schritt 2: Passwort eingeben (mit längerer Wartezeit)
           keystroke "${password}"
-          delay 0.5
+          delay 1.0
           
           -- Schritt 3: Enter drücken (Bestätigen)
           keystroke return
+          delay 0.5
         end tell
       `;
       
       console.log('   🔄 Führe kompletten Dialog-Flow aus...');
-      console.log('      1. Enter (Fortfahren)');
-      console.log('      2. Passwort eingeben');
+      console.log('      1. Enter (Fortfahren) - Wartezeit: 2.0s');
+      console.log('      2. Passwort eingeben - Wartezeit: 1.0s');
       console.log('      3. Enter (Bestätigen)');
       
       try {
@@ -264,10 +291,29 @@ test.describe('CHECK24 Login - Passkey', () => {
         console.log('   ✅ Dialog-Automatisierung abgeschlossen');
       } catch (error) {
         console.log('   ⚠️  Fehler bei Dialog-Automatisierung:', (error as Error).message.split('\n')[0]);
+        
+        // Fallback: Versuche nochmal mit längeren Delays
+        console.log('   🔄 Versuche Fallback mit längeren Wartezeiten...');
+        const fallbackScript = `
+          tell application "System Events"
+            delay 1.0
+            keystroke return
+            delay 3.0
+            keystroke "${password}"
+            delay 1.5
+            keystroke return
+          end tell
+        `;
+        try {
+          await execAsync(`osascript -e '${fallbackScript}'`);
+          console.log('   ✅ Fallback erfolgreich');
+        } catch (fallbackError) {
+          console.log('   ⚠️  Auch Fallback fehlgeschlagen');
+        }
       }
       
-      // Warte zusätzlich 2 Sekunden für Verarbeitung
-      await page.waitForTimeout(2000);
+      // Warte zusätzlich 3 Sekunden für Verarbeitung
+      await page.waitForTimeout(3000);
       
       // 5. Warte auf Weiterleitung zur Kundenbereich-Seite
       console.log('⏳ Warte auf Weiterleitung zur kundenbereich.check24.de...');
