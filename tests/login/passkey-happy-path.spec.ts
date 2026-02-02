@@ -68,63 +68,44 @@ test.describe('CHECK24 Login - Passkey', () => {
       console.log('🖱️  Klicke auf "mit Passkey anmelden"...');
       await passkeyButton.click();
       
-      // 5. Keychain Dialog automatisieren: Enter → Passwort → Enter
-      console.log('⏳ Warte 1 Sekunde auf Dialog...');
-      await page.waitForTimeout(1000);
+      // 5. Nativer Passkey-Dialog automatisieren: Enter → Passwort → Enter
+      console.log('⏳ Warte 2 Sekunden auf nativen Dialog...');
+      await page.waitForTimeout(2000);
       
-      console.log('🍎 Automatisiere Keychain-Dialog mit AppleScript...');
+      console.log('🍎 Automatisiere nativen Passkey-Dialog (AuthenticationServicesAgent)...');
       
-      // Schritt 1: Enter drücken (für "Fortfahren" Button)
-      console.log('   Schritt 1: Enter drücken (Fortfahren)...');
-      const appleScriptStep1 = `
-        tell application "System Events"
-          keystroke return
-        end tell
-      `;
-      
-      try {
-        await execAsync(`osascript -e '${appleScriptStep1}'`);
-        console.log('   ✅ Enter gedrückt');
-      } catch (error) {
-        console.log('   ⚠️  Enter fehlgeschlagen:', (error as Error).message.split('\n')[0]);
-      }
-      
-      // Kurz warten
-      await page.waitForTimeout(1000);
-      
-      // Schritt 2: Passwort "Ch12LoRoSTART" eingeben
-      console.log('   Schritt 2: Passwort eingeben...');
       const password = 'Ch12LoRoSTART';
-      const appleScriptStep2 = `
+      
+      // Komplettes AppleScript für alle 3 Schritte mit Fokus auf den richtigen Dialog
+      const appleScriptComplete = `
         tell application "System Events"
+          -- Schritt 1: Enter drücken (Fortfahren)
+          keystroke return
+          delay 1.5
+          
+          -- Schritt 2: Passwort eingeben
           keystroke "${password}"
-        end tell
-      `;
-      
-      try {
-        await execAsync(`osascript -e '${appleScriptStep2}'`);
-        console.log('   ✅ Passwort eingegeben');
-      } catch (error) {
-        console.log('   ⚠️  Passwort-Eingabe fehlgeschlagen');
-      }
-      
-      // Kurz warten
-      await page.waitForTimeout(500);
-      
-      // Schritt 3: Enter drücken (bestätigen)
-      console.log('   Schritt 3: Enter drücken (Bestätigen)...');
-      const appleScriptStep3 = `
-        tell application "System Events"
+          delay 0.5
+          
+          -- Schritt 3: Enter drücken (Bestätigen)
           keystroke return
         end tell
       `;
       
+      console.log('   🔄 Führe kompletten Dialog-Flow aus...');
+      console.log('      1. Enter (Fortfahren)');
+      console.log('      2. Passwort eingeben');
+      console.log('      3. Enter (Bestätigen)');
+      
       try {
-        await execAsync(`osascript -e '${appleScriptStep3}'`);
-        console.log('   ✅ Enter gedrückt (Bestätigung)');
+        await execAsync(`osascript -e '${appleScriptComplete}'`);
+        console.log('   ✅ Dialog-Automatisierung abgeschlossen');
       } catch (error) {
-        console.log('   ⚠️  Bestätigung fehlgeschlagen');
+        console.log('   ⚠️  Fehler bei Dialog-Automatisierung:', (error as Error).message.split('\n')[0]);
       }
+      
+      // Warte zusätzlich 2 Sekunden für Verarbeitung
+      await page.waitForTimeout(2000);
       
       // 6. Warte auf Weiterleitung zur Kundenbereich-Seite
       console.log('⏳ Warte auf Weiterleitung zur kundenbereich.check24.de...');
