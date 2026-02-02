@@ -142,11 +142,16 @@ app.get('/api/statistics', (req, res) => {
 app.post('/api/run-tests', async (req, res) => {
   try {
     const { testPath, project, headed, environment } = req.body;
-    const { getTestCountForPath } = require('../config/test-suites');
+    const { getTestSuiteCountForPath } = require('../config/test-suites');
 
     // Erstelle Test-Run sofort und gebe ID zurück
     const testName = testPath || 'All Tests';
-    const totalTests = getTestCountForPath(testPath);
+    
+    // Progress Bar nur für "Alle Tests" (testPath === 'tests' oder leer)
+    // Bei einzelnen Suites keine Progress Bar
+    // Zähle Test-Suites, nicht einzelne Tests
+    const isAllTests = !testPath || testPath === 'tests';
+    const totalTests = isAllTests ? getTestSuiteCountForPath(testPath) : null;
     
     const runId = db.createTestRun({
       testName,

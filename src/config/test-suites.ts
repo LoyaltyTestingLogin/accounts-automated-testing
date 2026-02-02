@@ -99,6 +99,28 @@ export function getTestCountForPath(testPath?: string): number {
 }
 
 /**
+ * Gibt die Anzahl der Test-Suites für einen Pfad zurück
+ * (für Progress Bar bei "Alle Tests")
+ */
+export function getTestSuiteCountForPath(testPath?: string): number {
+  if (!testPath || testPath === 'tests') {
+    // Alle Test-Suites
+    return TEST_SUITES.length;
+  }
+
+  if (testPath === 'tests/login') {
+    return TEST_SUITES.filter(suite => suite.path.startsWith('tests/login/')).length;
+  }
+
+  if (testPath === 'tests/registration') {
+    return TEST_SUITES.filter(suite => suite.path.startsWith('tests/registration/')).length;
+  }
+
+  // Einzelne Suite = 1
+  return 1;
+}
+
+/**
  * Gibt die Gesamtanzahl aller Tests zurück
  */
 export function getTotalTestCount(): number {

@@ -6,7 +6,7 @@ import { join } from 'path';
 import { getDatabase, TestRunInsert } from '../database/schema';
 import { getSlackNotifier } from '../slack/notifier';
 import { EventEmitter } from 'events';
-import { getTestCountForPath } from '../config/test-suites';
+import { getTestCountForPath, getTestSuiteCountForPath } from '../config/test-suites';
 
 const execAsync = promisify(exec);
 
@@ -71,8 +71,13 @@ export class PlaywrightRunner {
       });
       console.log(`📝 Verwende existierende Run-ID: ${runId}`);
     } else {
-      // Ermittle Anzahl der Tests basierend auf testPath (aus zentraler Konfiguration)
-      const totalTests = getTestCountForPath(testPath);
+      // Progress Bar nur für "Alle Tests" oder automatisierte Tests
+      // Bei einzelnen Suites keine Progress Bar
+      // Zähle Test-Suites, nicht einzelne Tests
+      const isAllTests = !testPath || testPath === 'tests';
+      const isScheduled = triggeredBy === 'scheduled';
+      const shouldShowProgress = isAllTests || isScheduled;
+      const totalTests = shouldShowProgress ? getTestSuiteCountForPath(testPath) : null;
 
       runId = this.db.createTestRun({
         testName,

@@ -704,24 +704,22 @@ export default function Dashboard() {
                       <div className="text-sm font-medium text-gray-900">
                         {run.testName}
                       </div>
-                      {run.status === 'running' && run.progress !== null && (
+                      {run.status === 'running' && run.totalTests !== null && run.totalTests > 1 && run.completedTests !== null && (
                         <div className="mt-2">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="text-xs text-gray-600 font-semibold mb-1">
+                            {run.completedTests} / {run.totalTests} Test-Suites abgeschlossen
+                          </div>
+                          <div className="flex items-center gap-2">
                             <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
                               <div 
                                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${run.progress}%` }}
+                                style={{ width: `${(run.completedTests / run.totalTests) * 100}%` }}
                               ></div>
                             </div>
-                            <span className="text-xs text-gray-600 font-medium min-w-[50px] text-right">
-                              {run.progress}%
+                            <span className="text-xs text-gray-500 font-medium min-w-[50px] text-right">
+                              {Math.round((run.completedTests / run.totalTests) * 100)}%
                             </span>
                           </div>
-                          {run.totalTests && run.completedTests !== null && (
-                            <div className="text-xs text-gray-500">
-                              {run.completedTests} / {run.totalTests} Tests abgeschlossen
-                            </div>
-                          )}
                         </div>
                       )}
                       {run.errorMessage && (
