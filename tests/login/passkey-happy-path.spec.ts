@@ -92,9 +92,9 @@ test.describe('CHECK24 Login - Passkey', () => {
       // Kurz warten
       await page.waitForTimeout(1000);
       
-      // Schritt 2: Passwort "1qay1qay" eingeben
+      // Schritt 2: Passwort "Ch12LoRoSTART" eingeben
       console.log('   Schritt 2: Passwort eingeben...');
-      const password = '1qay1qay';
+      const password = 'Ch12LoRoSTART';
       const appleScriptStep2 = `
         tell application "System Events"
           keystroke "${password}"
