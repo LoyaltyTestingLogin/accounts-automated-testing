@@ -40,16 +40,16 @@ app.get('/api/health', (req, res) => {
  */
 app.get('/api/test-runs', (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
+    // Kein Limit - zeige alle Tests bis zum Auto-Cleanup nach 4 Tagen
     const status = req.query.status as string;
     const environment = req.query.environment as 'prod' | 'test' | undefined;
 
     let testRuns;
     
     if (status && ['pending', 'running', 'passed', 'failed', 'timeout', 'cancelled'].includes(status)) {
-      testRuns = db.getTestRunsByStatus(status as any, limit, environment);
+      testRuns = db.getTestRunsByStatus(status as any, undefined, environment);
     } else {
-      testRuns = db.getRecentTestRuns(limit, environment);
+      testRuns = db.getRecentTestRuns(undefined, environment);
     }
 
     res.json({

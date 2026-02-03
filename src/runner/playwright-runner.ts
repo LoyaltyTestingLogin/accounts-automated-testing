@@ -49,10 +49,15 @@ export class PlaywrightRunner {
    * Führt Playwright-Tests aus
    */
   async runTests(options: TestRunOptions): Promise<TestResult[]> {
-    const { testPath, project, headed, triggeredBy, existingRunId, environment } = options;
+    let { testPath, project, headed, triggeredBy, existingRunId, environment } = options;
+
+    // Sicherheitscheck: Automatisierte Tests IMMER im headless Modus
+    if (triggeredBy === 'scheduled') {
+      headed = false;
+    }
 
     const env = environment || 'prod';
-    console.log(`🧪 Starte Tests: ${testPath || 'alle Tests'} auf ${env.toUpperCase()}`);
+    console.log(`🧪 Starte Tests: ${testPath || 'alle Tests'} auf ${env.toUpperCase()} (headed: ${headed || false})`);
 
     // Test-Run in DB erstellen oder existierende verwenden
     const testName = testPath || 'All Tests';
@@ -280,40 +285,27 @@ export class PlaywrightRunner {
       let completedTestsCount = 0;
       const testRun = this.db.getTestRun(runId);
       const totalTests = testRun?.totalTests || 1;
+      const isScheduledRun = testRun?.triggeredBy === 'scheduled';
+      
+      // Track welche Test-Files bereits abgeschlossen sind (für scheduled runs)
+      const completedTestFiles = new Set<string>();
 
       // STDOUT in Echtzeit streamen
       childProcess.stdout.on('data', (data: Buffer) => {
         const message = data.toString();
         console.log(message);
         
-        // Parse Playwright Output für Live-Progress
-        // Suche nach Patterns wie "[1/3]" oder "✓ Test Name" oder "✘ Test Name"
-        const testCompletionPatterns = [
-          /\[(\d+)\/\d+\]/,  // [1/3] Format
-          /✓\s+/,             // ✓ Test passed
-          /✘\s+/,             // ✘ Test failed
-          /×\s+/,             // × Test failed (alternative)
-        ];
-
-        for (const pattern of testCompletionPatterns) {
-          const match = message.match(pattern);
-          if (match) {
-            if (match[1]) {
-              // Extrahiere completed count aus [X/Y] Format
-              const completed = parseInt(match[1], 10);
-              if (completed > completedTestsCount) {
-                completedTestsCount = completed;
-                const progress = Math.round((completedTestsCount / totalTests) * 100);
-                
-                // Update Progress in DB
-                this.db.updateTestRun(runId, {
-                  progress,
-                  completedTests: completedTestsCount,
-                });
-              }
-            } else {
-              // ✓ oder ✘ gefunden - increment counter
-              completedTestsCount++;
+        // Für scheduled runs: Zähle nur abgeschlossene Test-FILES, nicht einzelne Cases
+        if (isScheduledRun) {
+          // Pattern: "tests/login/password-happy-path.spec.ts:X:Y › Test Name"
+          const fileCompletionPattern = /(tests\/[^:]+\.spec\.ts)/;
+          const match = message.match(fileCompletionPattern);
+          
+          if (match && (message.includes('✓') || message.includes('✘') || message.includes('×'))) {
+            const testFile = match[1];
+            if (!completedTestFiles.has(testFile)) {
+              completedTestFiles.add(testFile);
+              completedTestsCount = completedTestFiles.size;
               const progress = Math.round((completedTestsCount / totalTests) * 100);
               
               // Update Progress in DB
@@ -322,7 +314,45 @@ export class PlaywrightRunner {
                 completedTests: completedTestsCount,
               });
             }
-            break; // Nur einmal pro Message
+          }
+        } else {
+          // Für manuelle Tests: Parse Playwright Output für Live-Progress wie bisher
+          const testCompletionPatterns = [
+            /\[(\d+)\/\d+\]/,  // [1/3] Format
+            /✓\s+/,             // ✓ Test passed
+            /✘\s+/,             // ✘ Test failed
+            /×\s+/,             // × Test failed (alternative)
+          ];
+
+          for (const pattern of testCompletionPatterns) {
+            const match = message.match(pattern);
+            if (match) {
+              if (match[1]) {
+                // Extrahiere completed count aus [X/Y] Format
+                const completed = parseInt(match[1], 10);
+                if (completed > completedTestsCount) {
+                  completedTestsCount = completed;
+                  const progress = Math.round((completedTestsCount / totalTests) * 100);
+                  
+                  // Update Progress in DB
+                  this.db.updateTestRun(runId, {
+                    progress,
+                    completedTests: completedTestsCount,
+                  });
+                }
+              } else {
+                // ✓ oder ✘ gefunden - increment counter
+                completedTestsCount++;
+                const progress = Math.round((completedTestsCount / totalTests) * 100);
+                
+                // Update Progress in DB
+                this.db.updateTestRun(runId, {
+                  progress,
+                  completedTests: completedTestsCount,
+                });
+              }
+              break; // Nur einmal pro Message
+            }
           }
         }
         
@@ -440,11 +470,19 @@ export class PlaywrightRunner {
 
       const results: TestResult[] = [];
       
-      // Zähle alle Tests vorher
+      // Für scheduled runs: Zähle Test-Suites (Files), nicht einzelne Test-Cases
+      const isScheduledRun = triggeredBy === 'scheduled';
+      
       let totalTests = 0;
-      for (const suite of report.suites || []) {
-        for (const spec of suite.specs || []) {
-          totalTests += (spec.tests || []).length;
+      if (isScheduledRun) {
+        // Zähle nur die Anzahl der Test-Suites (Files)
+        totalTests = (report.suites || []).length;
+      } else {
+        // Für manuelle Tests: Zähle alle einzelnen Test-Cases
+        for (const suite of report.suites || []) {
+          for (const spec of suite.specs || []) {
+            totalTests += (spec.tests || []).length;
+          }
         }
       }
 
@@ -452,6 +490,7 @@ export class PlaywrightRunner {
       this.db.updateTestRun(runId, { totalTests });
 
       let completedTests = 0;
+      let completedSuites = 0;
 
       // Playwright JSON-Report parsen
       for (const suite of report.suites || []) {
@@ -516,15 +555,6 @@ export class PlaywrightRunner {
               triggeredBy,
             });
 
-            completedTests++;
-            const progress = Math.round((completedTests / totalTests) * 100);
-            
-            // Update Progress für Main-Run
-            this.db.updateTestRun(runId, {
-              progress,
-              completedTests,
-            });
-
             results.push({
               runId: testRunId,
               success,
@@ -536,6 +566,29 @@ export class PlaywrightRunner {
             });
           }
         }
+        
+        // Nach jedem Suite (Test-File) Progress aktualisieren
+        completedSuites++;
+        
+        // Für scheduled runs: Zähle abgeschlossene Suites
+        // Für manuelle runs: Zähle abgeschlossene Test-Cases
+        if (isScheduledRun) {
+          const progress = Math.round((completedSuites / totalTests) * 100);
+          this.db.updateTestRun(runId, {
+            progress,
+            completedTests: completedSuites,
+          });
+        }
+      }
+      
+      // Für manuelle Tests: Finaler Progress Update mit allen Cases
+      if (!isScheduledRun) {
+        completedTests = results.length;
+        const progress = Math.round((completedTests / totalTests) * 100);
+        this.db.updateTestRun(runId, {
+          progress,
+          completedTests,
+        });
       }
 
       return results.length > 0 ? results : [{

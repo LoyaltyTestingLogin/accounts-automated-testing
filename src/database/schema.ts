@@ -189,13 +189,27 @@ export class TestDatabase {
   /**
    * Letzte Test-Runs abrufen
    */
-  getRecentTestRuns(limit = 50, environment?: 'prod' | 'test'): TestRun[] {
-    const query = environment 
-      ? `SELECT * FROM test_runs WHERE environment = ? ORDER BY startTime DESC LIMIT ?`
-      : `SELECT * FROM test_runs ORDER BY startTime DESC LIMIT ?`;
+  getRecentTestRuns(limit?: number, environment?: 'prod' | 'test'): TestRun[] {
+    let query: string;
+    let rows: any[];
     
-    const stmt = this.db.prepare(query);
-    const rows = environment ? stmt.all(environment, limit) : stmt.all(limit);
+    if (limit) {
+      // Mit Limit
+      query = environment 
+        ? `SELECT * FROM test_runs WHERE environment = ? ORDER BY startTime DESC LIMIT ?`
+        : `SELECT * FROM test_runs ORDER BY startTime DESC LIMIT ?`;
+      
+      const stmt = this.db.prepare(query);
+      rows = environment ? stmt.all(environment, limit) : stmt.all(limit);
+    } else {
+      // Ohne Limit - alle anzeigen
+      query = environment 
+        ? `SELECT * FROM test_runs WHERE environment = ? ORDER BY startTime DESC`
+        : `SELECT * FROM test_runs ORDER BY startTime DESC`;
+      
+      const stmt = this.db.prepare(query);
+      rows = environment ? stmt.all(environment) : stmt.all();
+    }
     
     return (rows as any[]).map(row => this.mapRowToTestRun(row));
   }
@@ -203,13 +217,27 @@ export class TestDatabase {
   /**
    * Test-Runs nach Status filtern
    */
-  getTestRunsByStatus(status: TestRun['status'], limit = 50, environment?: 'prod' | 'test'): TestRun[] {
-    const query = environment
-      ? `SELECT * FROM test_runs WHERE status = ? AND environment = ? ORDER BY startTime DESC LIMIT ?`
-      : `SELECT * FROM test_runs WHERE status = ? ORDER BY startTime DESC LIMIT ?`;
+  getTestRunsByStatus(status: TestRun['status'], limit?: number, environment?: 'prod' | 'test'): TestRun[] {
+    let query: string;
+    let rows: any[];
     
-    const stmt = this.db.prepare(query);
-    const rows = environment ? stmt.all(status, environment, limit) : stmt.all(status, limit);
+    if (limit) {
+      // Mit Limit
+      query = environment
+        ? `SELECT * FROM test_runs WHERE status = ? AND environment = ? ORDER BY startTime DESC LIMIT ?`
+        : `SELECT * FROM test_runs WHERE status = ? ORDER BY startTime DESC LIMIT ?`;
+      
+      const stmt = this.db.prepare(query);
+      rows = environment ? stmt.all(status, environment, limit) : stmt.all(status, limit);
+    } else {
+      // Ohne Limit - alle anzeigen
+      query = environment
+        ? `SELECT * FROM test_runs WHERE status = ? AND environment = ? ORDER BY startTime DESC`
+        : `SELECT * FROM test_runs WHERE status = ? ORDER BY startTime DESC`;
+      
+      const stmt = this.db.prepare(query);
+      rows = environment ? stmt.all(status, environment) : stmt.all(status);
+    }
     
     return (rows as any[]).map(row => this.mapRowToTestRun(row));
   }
