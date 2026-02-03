@@ -297,21 +297,21 @@ export class PlaywrightRunner {
         
         // Für scheduled runs: Zähle nur abgeschlossene Test-FILES, nicht einzelne Cases
         if (isScheduledRun) {
-          // Pattern: "tests/login/password-happy-path.spec.ts:X:Y › Test Name"
-          const fileCompletionPattern = /(tests\/[^:]+\.spec\.ts)/;
-          const match = message.match(fileCompletionPattern);
+          // Pattern: "X passing" oder "X failing" am Ende eines Test-Files
+          // Dies erscheint nur einmal pro File als Zusammenfassung
+          const fileSummaryPattern = /(\d+) passing|(\d+) failing/;
+          const summaryMatch = message.match(fileSummaryPattern);
           
-          if (match && (message.includes('✓') || message.includes('✘') || message.includes('×'))) {
-            const testFile = match[1];
-            if (!completedTestFiles.has(testFile)) {
-              completedTestFiles.add(testFile);
-              completedTestsCount = completedTestFiles.size;
+          if (summaryMatch) {
+            // Erhöhe Counter nur, wenn wir unter dem Maximum sind
+            if (completedTestsCount < totalTests) {
+              completedTestsCount++;
               const progress = Math.round((completedTestsCount / totalTests) * 100);
               
               // Update Progress in DB
               this.db.updateTestRun(runId, {
-                progress,
-                completedTests: completedTestsCount,
+                progress: Math.min(progress, 100), // Nie über 100%
+                completedTests: Math.min(completedTestsCount, totalTests), // Nie über totalTests
               });
             }
           }
@@ -334,21 +334,21 @@ export class PlaywrightRunner {
                   completedTestsCount = completed;
                   const progress = Math.round((completedTestsCount / totalTests) * 100);
                   
-                  // Update Progress in DB
+                  // Update Progress in DB - mit Safety-Check
                   this.db.updateTestRun(runId, {
-                    progress,
-                    completedTests: completedTestsCount,
+                    progress: Math.min(progress, 100),
+                    completedTests: Math.min(completedTestsCount, totalTests),
                   });
                 }
               } else {
-                // ✓ oder ✘ gefunden - increment counter
+                // ✓ oder ✘ gefunden - increment counter (nur für manuelle Tests)
                 completedTestsCount++;
                 const progress = Math.round((completedTestsCount / totalTests) * 100);
                 
-                // Update Progress in DB
+                // Update Progress in DB - mit Safety-Check
                 this.db.updateTestRun(runId, {
-                  progress,
-                  completedTests: completedTestsCount,
+                  progress: Math.min(progress, 100),
+                  completedTests: Math.min(completedTestsCount, totalTests),
                 });
               }
               break; // Nur einmal pro Message
@@ -575,8 +575,8 @@ export class PlaywrightRunner {
         if (isScheduledRun) {
           const progress = Math.round((completedSuites / totalTests) * 100);
           this.db.updateTestRun(runId, {
-            progress,
-            completedTests: completedSuites,
+            progress: Math.min(progress, 100),
+            completedTests: Math.min(completedSuites, totalTests),
           });
         }
       }
@@ -586,8 +586,8 @@ export class PlaywrightRunner {
         completedTests = results.length;
         const progress = Math.round((completedTests / totalTests) * 100);
         this.db.updateTestRun(runId, {
-          progress,
-          completedTests,
+          progress: Math.min(progress, 100),
+          completedTests: Math.min(completedTests, totalTests),
         });
       }
 
