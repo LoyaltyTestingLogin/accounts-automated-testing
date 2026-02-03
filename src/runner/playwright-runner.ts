@@ -297,9 +297,10 @@ export class PlaywrightRunner {
         
         // Für scheduled runs: Zähle nur abgeschlossene Test-FILES, nicht einzelne Cases
         if (isScheduledRun) {
-          // Pattern: "X passing" oder "X failing" am Ende eines Test-Files
-          // Dies erscheint nur einmal pro File als Zusammenfassung
-          const fileSummaryPattern = /(\d+) passing|(\d+) failing/;
+          // Pattern: "X passed (time)" am Ende eines Test-Files
+          // Dies ist die finale Zusammenfassung die NUR EINMAL pro File erscheint
+          // Beispiel: "  6 passed (1.2m)" oder "  3 passed (45s)"
+          const fileSummaryPattern = /^\s+\d+\s+(passed|failed).*\(\d+\.?\d*[smh]\)/;
           const summaryMatch = message.match(fileSummaryPattern);
           
           if (summaryMatch) {
@@ -307,6 +308,8 @@ export class PlaywrightRunner {
             if (completedTestsCount < totalTests) {
               completedTestsCount++;
               const progress = Math.round((completedTestsCount / totalTests) * 100);
+              
+              console.log(`✅ Test-Suite ${completedTestsCount}/${totalTests} abgeschlossen`);
               
               // Update Progress in DB
               this.db.updateTestRun(runId, {
