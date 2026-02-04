@@ -494,11 +494,11 @@ export default function Dashboard() {
           <div className="card border-2 border-blue-200 bg-blue-50/30">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center justify-center gap-2">
                   <span className="text-2xl">🎬</span>
-                  Einzelner Test (mit Browser)
+                  Einzelner Test
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 mt-1 text-center">
                   Führt einen ausgewählten Test im Browser aus → <strong>Du kannst zusehen</strong>
                 </p>
               </div>
@@ -627,12 +627,12 @@ export default function Dashboard() {
           <div className="card border-2 border-purple-200 bg-purple-50/30">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center justify-center gap-2">
                   <span className="text-2xl">⚡</span>
-                  Alle Tests (ohne Browser)
+                  Alle Tests
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Führt alle {testSuites.length} Tests <strong>sequenziell nacheinander</strong> aus → Optional im Browser-Fenster zusehen
+                <p className="text-sm text-gray-600 mt-1 text-center">
+                  Führt alle {testSuites.length} Tests <strong>sequenziell nacheinander</strong> aus → <strong>Du kannst zusehen</strong>
                 </p>
               </div>
             </div>
