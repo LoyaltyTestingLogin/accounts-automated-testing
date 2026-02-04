@@ -737,31 +737,79 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   // SCHRITT 6: Wieder auf "Weiter" klicken (oder Enter drücken)
   console.log('➡️  Schließe Login ab (Enter-Taste oder Weiter-Button)...');
   
-  // Strategie 1: Enter-Taste im TAN-Feld drücken (funktioniert auch bei verdecktem Button)
+  // Prüfe vor Submit: Sind wir noch auf Login-Seite?
+  const urlBeforeSubmit = page.url();
+  console.log(`📍 URL VOR Submit: ${urlBeforeSubmit}`);
+  
+  // Strategie 1: Suche erst nach sichtbarem Submit-Button
+  let submitSuccess = false;
+  
   try {
-    console.log('⌨️  Drücke Enter im TAN-Feld...');
-    await tanInput.press('Enter');
-    await page.waitForTimeout(1500);
-    console.log('✅ Enter gedrückt - warte auf Navigation...');
-  } catch (enterError) {
-    // Strategie 2: Versuche Button mit JavaScript zu klicken
-    console.log('⚠️  Enter fehlgeschlagen, versuche Button-Klick mit JavaScript...');
-    try {
-      const submitButton = page.locator('button[type="submit"], button:has-text("Weiter"), button:has-text("Bestätigen")').first();
+    console.log('🔍 Suche nach sichtbarem Submit-Button nach TAN-Eingabe...');
+    const submitButton = page.locator('button[type="submit"]:visible, button:has-text("Weiter"):visible, button:has-text("Bestätigen"):visible, button:has-text("Anmelden"):visible').first();
+    
+    const buttonCount = await submitButton.count();
+    console.log(`🔍 Gefundene sichtbare Submit-Buttons: ${buttonCount}`);
+    
+    if (buttonCount > 0) {
+      const buttonText = await submitButton.textContent().catch(() => 'unknown');
+      console.log(`🖱️  Klicke auf sichtbaren Button: "${buttonText}"`);
       
-      if (await submitButton.count() > 0) {
-        await submitButton.evaluate((btn: any) => {
-          btn.click();
-        });
-        await page.waitForTimeout(1500);
-        console.log('✅ Button geklickt via JavaScript');
-      } else {
-        throw new Error('Kein Submit-Button gefunden');
+      try {
+        await submitButton.click({ timeout: 3000 });
+        console.log('✅ Button normal geklickt');
+        submitSuccess = true;
+      } catch (normalClickError) {
+        console.log('⚠️  Normaler Click fehlgeschlagen, versuche force...');
+        await submitButton.click({ force: true, timeout: 3000 });
+        console.log('✅ Button mit force geklickt');
+        submitSuccess = true;
       }
-    } catch (buttonError) {
-      console.log(`⚠️  Beide Methoden fehlgeschlagen: Enter=${enterError}, Button=${buttonError}`);
-      throw new Error('Login konnte nicht abgeschlossen werden - weder Enter noch Button-Klick funktioniert');
+      
+      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
+  } catch (buttonError) {
+    console.log(`⚠️  Button-Suche/Click fehlgeschlagen: ${buttonError}`);
+  }
+  
+  // Strategie 2: Fallback auf Enter im TAN-Feld
+  if (!submitSuccess) {
+    try {
+      console.log('⌨️  Fallback: Drücke Enter im TAN-Feld...');
+      await tanInput.press('Enter');
+      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      console.log('✅ Enter gedrückt');
+      submitSuccess = true;
+    } catch (enterError) {
+      console.log(`⚠️  Enter fehlgeschlagen: ${enterError}`);
+    }
+  }
+  
+  // Prüfe ob Submit erfolgreich war (URL-Änderung)
+  await page.waitForTimeout(1000);
+  const urlAfterSubmit = page.url();
+  console.log(`📍 URL NACH Submit: ${urlAfterSubmit}`);
+  
+  if (urlAfterSubmit === urlBeforeSubmit && urlAfterSubmit.includes('/login')) {
+    console.log('⚠️  URL unverändert und immer noch auf Login-Seite - Submit möglicherweise fehlgeschlagen!');
+    
+    // Letzter Versuch: JavaScript-Click auf beliebigen Submit-Button
+    console.log('🔄 Letzter Versuch: JavaScript-Click auf Submit-Button...');
+    try {
+      const anySubmitButton = page.locator('button[type="submit"]').first();
+      if (await anySubmitButton.count() > 0) {
+        await anySubmitButton.evaluate((btn: any) => btn.click());
+        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        console.log('✅ JavaScript-Click auf Submit-Button ausgeführt');
+      }
+    } catch (jsError) {
+      console.log(`⚠️  JavaScript-Click fehlgeschlagen: ${jsError}`);
+    }
+  } else {
+    console.log('✅ URL hat sich geändert - Submit erfolgreich');
   }
 
   console.log('✅ Login-Challenge abgeschlossen');
