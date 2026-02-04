@@ -47,7 +47,7 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       const weiterButton = page.getByRole('button', { name: 'Weiter' });
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       // SCHRITT 2: Registrierungsformular ausfüllen
       console.log('📝 SCHRITT 2: Fülle Registrierungsformular aus...');
@@ -83,7 +83,7 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       const weiterButton2 = page.getByRole('button', { name: 'Weiter' });
       await weiterButton2.click();
       console.log('✅ "Weiter" wurde geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       // SCHRITT 3: E-Mail-Verifizierung - TAN aus E-Mail holen
       console.log('📧 SCHRITT 3: Warte auf TAN-Code per E-Mail...');
@@ -159,14 +159,13 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       // SCHRITT 5: Warte auf Auto-Submit und Callback-Weiterleitung
       console.log('⏳ SCHRITT 5: Warte auf Auto-Submit und Weiterleitung zum Kundenbereich...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(2000);
       
       try {
-        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 8000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
       }
 
       // SCHRITT 6: c24session Cookie verifizieren
@@ -245,7 +244,7 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
       await entfernenButton.click();
       console.log('   ✅ "entfernen" geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       console.log('✅ Konto erfolgreich gelöscht');
 

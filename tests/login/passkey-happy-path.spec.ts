@@ -129,17 +129,14 @@ test.describe('CHECK24 Login - Passkey', () => {
         }
       }
       
-      // Warte zusätzlich 3 Sekunden für Verarbeitung
-      await page.waitForTimeout(3000);
-      
       // 6. Warte auf Weiterleitung zur Kundenbereich-Seite
       console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
       
       try {
-        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 8000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅✅✅ LOGIN ERFOLGREICH - Weitergeleitet! ✅✅✅');
       } catch (error) {
-        console.log('⚠️  Keine automatische Weiterleitung innerhalb 8 Sekunden');
+        console.log('⚠️  Keine automatische Weiterleitung innerhalb 5 Sekunden');
         const currentUrl = page.url();
         console.log('📍 Aktuelle URL:', currentUrl);
         
@@ -315,17 +312,14 @@ test.describe('CHECK24 Login - Passkey', () => {
         }
       }
       
-      // Warte zusätzlich 3 Sekunden für Verarbeitung
-      await page.waitForTimeout(3000);
-      
       // 5. Warte auf Weiterleitung zur Kundenbereich-Seite
       console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
       
       try {
-        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 8000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅✅✅ LOGIN ERFOLGREICH - Weitergeleitet! ✅✅✅');
       } catch (error) {
-        console.log('⚠️  Keine automatische Weiterleitung innerhalb 8 Sekunden');
+        console.log('⚠️  Keine automatische Weiterleitung innerhalb 5 Sekunden');
         const currentUrl = page.url();
         console.log('📍 Aktuelle URL:', currentUrl);
         

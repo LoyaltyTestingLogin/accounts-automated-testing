@@ -299,14 +299,13 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
 
     // Warte auf Weiterleitung zum Kundenbereich
     console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
-    await page.waitForTimeout(2000);
     
     try {
-      await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
+      await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 3000 });
       console.log('✅ Zum Kundenbereich weitergeleitet');
     } catch (e) {
       console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
     }
 
     // Login-Erfolg verifizieren (c24session Cookie prüfen)
@@ -380,14 +379,13 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
       
       // Warte auf Weiterleitung zum Kundenbereich
       console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
-      await page.waitForTimeout(2000);
       
       try {
-        await page.waitForURL(/kundenbereich\.check24\.de/, { timeout: 10000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(1000);
       }
 
       // Login-Erfolg verifizieren (Combined Account hat keinen Phone Collector)
@@ -516,15 +514,14 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
       
       // Warte auf Weiterleitung zum Kundenbereich
       console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
-      await page.waitForTimeout(2000);
       
       // Warte explizit auf kundenbereich URL
       try {
-        await page.waitForURL(/kundenbereich\.check24\.de/, { timeout: 10000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(1000);
       }
       
       // Debug: Prüfe aktuelle URL

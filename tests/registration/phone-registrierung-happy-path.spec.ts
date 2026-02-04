@@ -48,7 +48,7 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       const weiterButton = page.getByRole('button', { name: 'Weiter' });
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       // SCHRITT 2: E-Mail-Adresse eingeben
       const timestamp = new Date().toISOString()
@@ -68,7 +68,7 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       const weiterButton2 = page.getByRole('button', { name: 'Weiter' });
       await weiterButton2.click();
       console.log('✅ "Weiter" wurde geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       // SCHRITT 3: Registrierungsformular ausfüllen
       console.log('📝 SCHRITT 3: Fülle Registrierungsformular aus...');
@@ -104,7 +104,7 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       const weiterButton3 = page.getByRole('button', { name: 'Weiter' });
       await weiterButton3.click();
       console.log('✅ "Weiter" wurde geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       // SCHRITT 4: E-Mail-Verifizierung - TAN aus E-Mail holen
       console.log('📧 SCHRITT 4: Warte auf E-Mail-TAN-Code...');
@@ -180,7 +180,7 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       // SCHRITT 6: Warte auf nächsten Screen (SMS-Verifizierung)
       console.log('⏳ SCHRITT 6: Warte auf SMS-Verifizierungs-Screen...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       // SCHRITT 7: SMS-Verifizierung - TAN aus weitergeleiteter SMS-E-Mail holen
       console.log('📱 SCHRITT 7: Warte auf SMS-TAN-Code (weitergeleitet per E-Mail)...');
@@ -253,14 +253,13 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       // SCHRITT 9: Warte auf Auto-Submit und Callback-Weiterleitung
       console.log('⏳ SCHRITT 9: Warte auf Auto-Submit und Weiterleitung zum Kundenbereich...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(2000);
       
       try {
-        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 8000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
       }
 
       // SCHRITT 10: c24session Cookie verifizieren
@@ -339,7 +338,7 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
       await entfernenButton.click();
       console.log('   ✅ "entfernen" geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
 
       console.log('✅ Konto erfolgreich gelöscht');
 

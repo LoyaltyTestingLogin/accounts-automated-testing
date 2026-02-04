@@ -31,18 +31,18 @@ export async function loginWithPassword(page: Page, email: string, password: str
   await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   
   console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(200);
   await emailInput.fill(email);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
 
   // Klick auf "Weiter"-Button
   const weiterButton = page.locator('button[type="submit"]').first();
   
   console.log('➡️  Klicke auf "Weiter"-Button...');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(200);
   await weiterButton.click({ force: true });
   console.log('✅ "Weiter" wurde geklickt');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(500);
 
   // SCHRITT 2: Passwort eingeben (erscheint erst nach "Weiter"-Klick)
   console.log('🔍 Warte auf Passwort-Feld...');
@@ -182,7 +182,7 @@ export async function logout(page: Page) {
 export async function selectChallengeMethod(page: Page, method: 'email' | 'phone'): Promise<void> {
   console.log(`🔍 Prüfe auf Selection Screen für Login Challenge...`);
   
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1000);
   
   // Prüfe ob Selection Screen vorhanden ist
   const bodyText = await page.locator('body').textContent() || '';
@@ -348,7 +348,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   console.log('🔐 Prüfe auf Login-Challenge...');
 
   // Warte auf Challenge-Seite
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1000);
 
   // Debug: Zeige aktuelle URL und Seitentitel
   const currentUrl = page.url();
@@ -405,7 +405,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
     
     // WICHTIG: Nach der Auswahl warten, damit das DOM aktualisiert wird
     console.log('⏳ Warte nach Auswahl, damit UI aktualisiert wird...');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
     
     // VALIDIERUNG: Prüfe ob die richtige Option wirklich ausgewählt ist
     console.log('🔍 Validiere ob die Auswahl erfolgreich war...');
@@ -522,7 +522,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
     }
     
     // Warte auf mögliche Navigation
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
     
     const urlAfterClick = page.url();
     console.log(`📍 URL NACH Button-Click: ${urlAfterClick}`);
@@ -743,7 +743,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   console.log('✅ Login-Challenge abgeschlossen');
   
   // SCHRITT 7: Phone-Hinterlegungs-Screen überspringen (falls vorhanden)
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(1500);
   
   console.log('🔍 Analysiere Seite nach Login-Challenge...');
   const postChallengeUrl = page.url();
@@ -827,7 +827,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
             await button.click({ force: true, timeout: 5000 });
             console.log(`✅ Button geklickt (${selector})`);
             laterClicked = true;
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(1000);
             break;
           } catch (clickErr) {
             // Fallback: JavaScript-Klick
@@ -835,7 +835,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
             await button.evaluate((btn: any) => btn.click());
             console.log(`✅ Button geklickt via JavaScript (${selector})`);
             laterClicked = true;
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(1000);
             break;
           }
         }
@@ -859,7 +859,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
       console.log('✅ Phone-Screen übersprungen');
       
       // Warte auf Navigation
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
       const newUrl = page.url();
       console.log(`📍 Neue URL nach Skip: ${newUrl}`);
     }
