@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { TestRun } from '../database/schema';
+import { SLACK_CONFIG } from '../config/slack';
 
 /**
  * Slack-Integration für Test-Benachrichtigungen
@@ -14,10 +15,12 @@ export class SlackNotifier {
   private webhookUrl: string;
 
   constructor(webhookUrl?: string) {
-    this.webhookUrl = webhookUrl || process.env.SLACK_WEBHOOK_URL || '';
+    // Priorität: 1. Parameter, 2. Config-Datei, 3. ENV-Variable (Fallback)
+    this.webhookUrl = webhookUrl || SLACK_CONFIG.webhookUrl || process.env.SLACK_WEBHOOK_URL || '';
     
     if (!this.webhookUrl) {
-      console.warn('⚠️  SLACK_WEBHOOK_URL nicht konfiguriert - Benachrichtigungen deaktiviert');
+      console.warn('⚠️  Slack Webhook URL nicht konfiguriert - Benachrichtigungen deaktiviert');
+      console.warn('⚠️  Setze die URL in src/config/slack.ts');
     }
   }
 
@@ -101,7 +104,7 @@ export class SlackNotifier {
    * Erstellt Slack-Message für Testfehler
    */
   private buildFailureMessage(testRun: TestRun, dashboardUrl?: string) {
-    const baseUrl = dashboardUrl || process.env.DASHBOARD_BASE_URL || 'http://localhost:3000';
+    const baseUrl = dashboardUrl || SLACK_CONFIG.dashboardUrl;
     const detailUrl = `${baseUrl}/test-runs/${testRun.id}`;
     
     const duration = testRun.duration ? `${(testRun.duration / 1000).toFixed(2)}s` : 'N/A';
@@ -213,7 +216,7 @@ export class SlackNotifier {
    * Erstellt Slack-Message für Test-Timeout
    */
   private buildTimeoutMessage(testRun: TestRun, dashboardUrl?: string) {
-    const baseUrl = dashboardUrl || process.env.DASHBOARD_BASE_URL || 'http://localhost:3000';
+    const baseUrl = dashboardUrl || SLACK_CONFIG.dashboardUrl;
     const detailUrl = `${baseUrl}/test-runs/${testRun.id}`;
     
     const duration = testRun.duration ? `${(testRun.duration / 1000).toFixed(2)}s` : 'N/A';
@@ -332,7 +335,7 @@ export class SlackNotifier {
    * Erstellt Slack-Message für Test-Wiederherstellung
    */
   private buildRecoveryMessage(testRun: TestRun, dashboardUrl?: string) {
-    const baseUrl = dashboardUrl || process.env.DASHBOARD_BASE_URL || 'http://localhost:3000';
+    const baseUrl = dashboardUrl || SLACK_CONFIG.dashboardUrl;
     const detailUrl = `${baseUrl}/test-runs/${testRun.id}`;
     
     const duration = testRun.duration ? `${(testRun.duration / 1000).toFixed(2)}s` : 'N/A';
