@@ -256,11 +256,11 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       await page.waitForTimeout(2000);
       
       try {
-        await page.waitForURL(/kundenbereich\.check24\.de/, { timeout: 15000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 8000 });
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
       }
 
       // SCHRITT 10: c24session Cookie verifizieren

@@ -34,3 +34,13 @@ export function getEnvironmentName(): string {
   const environment = getEnvironment();
   return environment === 'test' ? 'TEST' : 'PROD';
 }
+
+/**
+ * Gibt die Kundenbereich-URL für die aktuelle Umgebung zurück
+ */
+export function getKundenbereichUrl(): string {
+  const environment = getEnvironment();
+  return environment === 'test' 
+    ? 'https://kundenbereich.check24-test.de'
+    : 'https://kundenbereich.check24.de';
+}

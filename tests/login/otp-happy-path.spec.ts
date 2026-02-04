@@ -302,11 +302,11 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
     await page.waitForTimeout(2000);
     
     try {
-      await page.waitForURL(/kundenbereich\.check24\.de/, { timeout: 10000 });
+      await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
       console.log('✅ Zum Kundenbereich weitergeleitet');
     } catch (e) {
       console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(2000);
     }
 
     // Login-Erfolg verifizieren (c24session Cookie prüfen)

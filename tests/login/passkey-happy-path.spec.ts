@@ -1,6 +1,6 @@
 import { test, expect, chromium } from '@playwright/test';
 import { TEST_ACCOUNTS } from '../fixtures/accounts';
-import { getLoginUrl } from '../helpers/environment';
+import { getLoginUrl, getKundenbereichUrl } from '../helpers/environment';
 import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
@@ -39,7 +39,8 @@ test.describe('CHECK24 Login - Passkey', () => {
     try {
       // 1. Zur Login-Seite navigieren
       const baseUrl = getLoginUrl();
-      const loginUrl = `${baseUrl}/login?redirect_uri=https://kundenbereich.check24.de`;
+      const kundenbereichUrl = getKundenbereichUrl();
+      const loginUrl = `${baseUrl}/login?redirect_uri=${kundenbereichUrl}`;
       
       console.log('📍 Navigiere zu:', loginUrl);
       await page.goto(loginUrl);
@@ -132,13 +133,13 @@ test.describe('CHECK24 Login - Passkey', () => {
       await page.waitForTimeout(3000);
       
       // 6. Warte auf Weiterleitung zur Kundenbereich-Seite
-      console.log('⏳ Warte auf Weiterleitung zur kundenbereich.check24.de...');
+      console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
       
       try {
-        await page.waitForURL('**/kundenbereich.check24.de/**', { timeout: 15000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 8000 });
         console.log('✅✅✅ LOGIN ERFOLGREICH - Weitergeleitet! ✅✅✅');
       } catch (error) {
-        console.log('⚠️  Keine automatische Weiterleitung innerhalb 15 Sekunden');
+        console.log('⚠️  Keine automatische Weiterleitung innerhalb 8 Sekunden');
         const currentUrl = page.url();
         console.log('📍 Aktuelle URL:', currentUrl);
         
@@ -218,7 +219,8 @@ test.describe('CHECK24 Login - Passkey', () => {
     try {
       // 1. Zur Login-Seite navigieren
       const baseUrl = getLoginUrl();
-      const loginUrl = `${baseUrl}/login?redirect_uri=https://kundenbereich.check24.de`;
+      const kundenbereichUrl = getKundenbereichUrl();
+      const loginUrl = `${baseUrl}/login?redirect_uri=${kundenbereichUrl}`;
       
       console.log('📍 Navigiere zu:', loginUrl);
       await page.goto(loginUrl);
@@ -317,13 +319,13 @@ test.describe('CHECK24 Login - Passkey', () => {
       await page.waitForTimeout(3000);
       
       // 5. Warte auf Weiterleitung zur Kundenbereich-Seite
-      console.log('⏳ Warte auf Weiterleitung zur kundenbereich.check24.de...');
+      console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
       
       try {
-        await page.waitForURL('**/kundenbereich.check24.de/**', { timeout: 15000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 8000 });
         console.log('✅✅✅ LOGIN ERFOLGREICH - Weitergeleitet! ✅✅✅');
       } catch (error) {
-        console.log('⚠️  Keine automatische Weiterleitung innerhalb 15 Sekunden');
+        console.log('⚠️  Keine automatische Weiterleitung innerhalb 8 Sekunden');
         const currentUrl = page.url();
         console.log('📍 Aktuelle URL:', currentUrl);
         

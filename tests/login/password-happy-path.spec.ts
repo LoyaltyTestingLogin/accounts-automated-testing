@@ -836,7 +836,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
         console.log(`📍 Finale URL: ${finalUrl}`);
         
         // Prüfe ob wir auf Kundenbereich sind
-        if (finalUrl.includes('kundenbereich.check24.de')) {
+        if (finalUrl.includes('kundenbereich.check24.de') || finalUrl.includes('kundenbereich.check24-test.de')) {
           console.log('✅ Erfolgreich auf Kundenbereich weitergeleitet');
         } else if (finalUrl.includes('process=failed')) {
           throw new Error('Login fehlgeschlagen: URL zeigt process=failed');
@@ -1041,7 +1041,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
         console.log(`📍 Finale URL: ${finalUrl}`);
 
         // Prüfe ob wir auf Kundenbereich sind
-        if (finalUrl.includes('kundenbereich.check24.de')) {
+        if (finalUrl.includes('kundenbereich.check24.de') || finalUrl.includes('kundenbereich.check24-test.de')) {
           console.log('✅ Erfolgreich auf Kundenbereich weitergeleitet');
         } else if (finalUrl.includes('process=failed')) {
           throw new Error('2FA-Login fehlgeschlagen: URL zeigt process=failed');

@@ -365,10 +365,10 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         const finalUrl = page.url();
         console.log(`📍 Finale URL: ${finalUrl}`);
         
-        if (finalUrl.includes('kundenbereich.check24.de')) {
+        if (finalUrl.includes('kundenbereich.check24.de') || finalUrl.includes('kundenbereich.check24-test.de')) {
           console.log('✅ Zum Kundenbereich weitergeleitet');
         } else {
-          console.log('⚠️  Noch nicht auf kundenbereich.check24.de - URL wird möglicherweise noch aktualisiert');
+          console.log('⚠️  Noch nicht auf Kundenbereich - URL wird möglicherweise noch aktualisiert');
           await page.waitForTimeout(3000);
           console.log(`📍 URL nach zusätzlichem Warten: ${page.url()}`);
         }
@@ -675,11 +675,11 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       await page.waitForLoadState('networkidle');
       
       try {
-        await page.waitForURL(/kundenbereich\.check24\.de/, { timeout: 10000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
       }
 
       // SCHRITT 13: Login-Erfolg verifizieren
@@ -959,11 +959,11 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       await page.waitForLoadState('networkidle');
       
       try {
-        await page.waitForURL(/kundenbereich\.check24\.de/, { timeout: 10000 });
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2000);
       }
 
       // SCHRITT 13: Login-Erfolg verifizieren
