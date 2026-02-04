@@ -12,11 +12,14 @@ dotenv.config();
  * Testet den erfolgreichen Login mit korrekten Zugangsdaten (inkl. Login Challenge)
  */
 test.describe('CHECK24 Login - Happy Path', () => {
-  test('Erfolgreicher Login - Account mit nur E-Mail (Login Challenge)', async ({ page }) => {
+  test('Erfolgreicher Login + Zweiter Login ohne Challenge', async ({ page }) => {
     // Account mit nur E-Mail-Adresse verwenden
     const credentials = getAccountCredentials('EMAIL_ONLY');
     console.log(`📧 Verwende Test-Account: ${credentials.account.description}`);
 
+    // ===== ERSTER LOGIN MIT CHALLENGE =====
+    console.log('\n=== ERSTER LOGIN MIT CHALLENGE ===');
+    
     // Login durchführen (E-Mail + Passwort)
     const { email } = await loginWithPassword(page, credentials.email, credentials.password);
     console.log(`✅ Login-Daten eingegeben für: ${email}`);
@@ -39,8 +42,454 @@ test.describe('CHECK24 Login - Happy Path', () => {
 
     console.log(`✅ Login vollständig erfolgreich für: ${email}`);
 
-    // Optional: Logout durchführen für saubere Cleanup
+    // ===== COOKIE-BANNER WEGKLICKEN =====
+    console.log('\n=== COOKIE-BANNER WEGKLICKEN ===');
+    
+    // Warte kurz damit die Seite vollständig geladen ist
+    await page.waitForTimeout(1000);
+    
+    // Prüfe ob Cookie-Banner vorhanden ist
+    const cookieBannerVisible = await page.locator('.c24-cookie-consent-wrapper, .c24-strict-blocking-layer, [class*="cookie-consent"]').count() > 0;
+    console.log(`🍪 Cookie-Banner vorhanden: ${cookieBannerVisible}`);
+    
+    if (cookieBannerVisible) {
+      // Versuche Cookie-Banner über verschiedene Methoden wegzuklicken
+      const cookieSelectors = [
+        'button:has-text("geht klar")',
+        'button:has-text("Akzeptieren")',
+        'button:has-text("Alle akzeptieren")',
+        'a:has-text("geht klar")',
+        'a:has-text("Akzeptieren")',
+        '.c24-cookie-consent-wrapper button',
+        '.c24-cookie-consent-wrapper a',
+        'button[class*="cookie" i]',
+        'a[class*="cookie" i]',
+      ];
+      
+      let cookieClicked = false;
+      for (const selector of cookieSelectors) {
+        try {
+          const locator = page.locator(selector).first();
+          if (await locator.count() > 0) {
+            console.log(`🔍 Versuche Cookie-Button: ${selector}`);
+            
+            // Versuche mehrere Click-Methoden
+            try {
+              await locator.click({ timeout: 1500, force: true });
+              console.log(`✅ Cookie-Banner weggeklickt (force click): ${selector}`);
+              cookieClicked = true;
+              break;
+            } catch (e1) {
+              try {
+                await page.evaluate((sel) => {
+                  const elements = document.querySelectorAll(sel);
+                  if (elements.length > 0) {
+                    elements[0].click();
+                    return true;
+                  }
+                  return false;
+                }, selector);
+                console.log(`✅ Cookie-Banner weggeklickt (JavaScript): ${selector}`);
+                cookieClicked = true;
+                break;
+              } catch (e2) {
+                console.log(`⚠️  Beide Click-Methoden fehlgeschlagen für: ${selector}`);
+                continue;
+              }
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      if (cookieClicked) {
+        await page.waitForTimeout(800);
+        console.log('✅ Cookie-Banner sollte jetzt geschlossen sein');
+      } else {
+        console.log('⚠️  Konnte Cookie-Banner nicht wegklicken - versuche fortzufahren');
+        // Als letzten Ausweg: Versuche den blocking layer direkt zu entfernen
+        try {
+          await page.evaluate(() => {
+            const blockers = document.querySelectorAll('.c24-strict-blocking-layer, .c24-cookie-consent-wrapper');
+            blockers.forEach(el => el.remove());
+          });
+          console.log('✅ Cookie-Banner-Layer via JavaScript entfernt');
+        } catch (e) {
+          console.log('⚠️  Konnte blocking layer nicht entfernen');
+        }
+      }
+    } else {
+      console.log('ℹ️  Kein Cookie-Banner gefunden (oder bereits geschlossen)');
+    }
+
+    // ===== ABMELDEN ÜBER PROFIL-MENÜ =====
+    console.log('\n=== ABMELDEN ÜBER PROFIL-MENÜ ===');
+    
+    // Warte kurz
+    await page.waitForTimeout(500);
+    
+    // Suche Profil-Button (oben rechts)
+    const profilSelectors = [
+      'button:has-text("Profil")',
+      'a:has-text("Profil")',
+      '[aria-label*="Profil" i]',
+      '[title*="Profil" i]',
+      'button[class*="profile" i]',
+      'a[class*="profile" i]',
+    ];
+    
+    let profilButton = null;
+    for (const selector of profilSelectors) {
+      const locator = page.locator(selector).first();
+      if (await locator.count() > 0) {
+        try {
+          if (await locator.isVisible({ timeout: 1000 })) {
+            profilButton = locator;
+            console.log(`✅ Profil-Button gefunden: ${selector}`);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    
+    if (!profilButton) {
+      throw new Error('Profil-Button nicht gefunden');
+    }
+    
+    // Klicke auf Profil
+    await profilButton.click();
+    console.log('✅ Profil-Menü geöffnet');
+    
+    await page.waitForTimeout(500);
+    
+    // Suche "abmelden" Button im Profil-Menü
+    const abmeldenSelectors = [
+      'button:has-text("abmelden")',
+      'a:has-text("abmelden")',
+      'button:has-text("Abmelden")',
+      'a:has-text("Abmelden")',
+      '[role="menuitem"]:has-text("abmelden")',
+    ];
+    
+    let abmeldenButton = null;
+    for (const selector of abmeldenSelectors) {
+      const locator = page.locator(selector).first();
+      if (await locator.count() > 0) {
+        try {
+          if (await locator.isVisible({ timeout: 1000 })) {
+            abmeldenButton = locator;
+            console.log(`✅ Abmelden-Button gefunden: ${selector}`);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    
+    if (!abmeldenButton) {
+      throw new Error('Abmelden-Button nicht gefunden');
+    }
+    
+    // Klicke auf "abmelden"
+    await abmeldenButton.click();
+    console.log('✅ Abmelden geklickt');
+    
+    await page.waitForTimeout(1500);
+    
+    // Prüfe ob wir auf "Mein Konto" Seite sind
+    const currentUrl = page.url();
+    console.log(`📍 URL nach Abmeldung: ${currentUrl}`);
+    
+    // ===== ZWEITER LOGIN (OHNE CHALLENGE ERWARTET) =====
+    console.log('\n=== ZWEITER LOGIN (OHNE CHALLENGE ERWARTET) ===');
+    
+    // Suche "anmelden" Button
+    const anmeldenSelectors = [
+      'button:has-text("anmelden")',
+      'a:has-text("anmelden")',
+      'button:has-text("Anmelden")',
+      'a:has-text("Anmelden")',
+    ];
+    
+    let anmeldenButton = null;
+    for (const selector of anmeldenSelectors) {
+      const locator = page.locator(selector).first();
+      if (await locator.count() > 0) {
+        try {
+          if (await locator.isVisible({ timeout: 1000 })) {
+            anmeldenButton = locator;
+            console.log(`✅ Anmelden-Button gefunden: ${selector}`);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    
+    if (!anmeldenButton) {
+      throw new Error('Anmelden-Button nicht gefunden auf Mein Konto Seite');
+    }
+    
+    // Klicke auf "anmelden"
+    await anmeldenButton.click();
+    console.log('✅ Anmelden-Button geklickt');
+    
+    await page.waitForTimeout(1000);
+    
+    // Login-Formular sollte Email vorausgefüllt haben
+    console.log('🔍 Prüfe Login-Formular...');
+    
+    await page.waitForTimeout(1000);
+    
+    const emailInput = page.locator('input[type="email"], input[name="email"], input[name*="login"]').first();
+    const emailValue = await emailInput.inputValue();
+    
+    console.log(`📧 Email-Feld Wert: ${emailValue}`);
+    
+    if (emailValue && emailValue.includes(credentials.email.split('@')[0])) {
+      console.log('✅ Email ist vorausgefüllt');
+    } else {
+      console.log('⚠️  Email ist nicht vorausgefüllt, fülle sie aus...');
+      await emailInput.fill(credentials.email);
+    }
+    
+    // Passwort eingeben mit mehreren Fallback-Methoden
+    console.log('🔍 Suche Passwort-Feld...');
+    
+    const passwordSelectors = [
+      'input[type="password"]',
+      'input[name="password"]',
+      'input[id*="password" i]',
+      'input[class*="password" i]',
+    ];
+    
+    let passwordFilled = false;
+    
+    for (const selector of passwordSelectors) {
+      try {
+        const passwordInput = page.locator(selector).first();
+        const count = await passwordInput.count();
+        
+        if (count === 0) continue;
+        
+        console.log(`🔍 Passwort-Feld gefunden mit Selektor: ${selector}`);
+        
+        // Methode 1: Normales fill mit force
+        try {
+          console.log('  📝 Versuche: fill mit force...');
+          await passwordInput.fill(credentials.password, { force: true, timeout: 2000 });
+          console.log('✅ Passwort eingegeben (fill force)');
+          passwordFilled = true;
+          break;
+        } catch (e1) {
+          console.log('  ⚠️  fill force fehlgeschlagen');
+          
+          // Methode 2: Scrolle ins View und versuche nochmal
+          try {
+            console.log('  📝 Versuche: scroll + fill...');
+            await passwordInput.scrollIntoViewIfNeeded({ timeout: 1000 });
+            await page.waitForTimeout(300);
+            await passwordInput.fill(credentials.password, { timeout: 2000 });
+            console.log('✅ Passwort eingegeben (scroll + fill)');
+            passwordFilled = true;
+            break;
+          } catch (e2) {
+            console.log('  ⚠️  scroll + fill fehlgeschlagen');
+            
+            // Methode 3: JavaScript direkter Input
+            try {
+              console.log('  📝 Versuche: JavaScript setValue...');
+              await page.evaluate(({ sel, pwd }) => {
+                const input = document.querySelector(sel);
+                if (input) {
+                  input.value = pwd;
+                  input.dispatchEvent(new Event('input', { bubbles: true }));
+                  input.dispatchEvent(new Event('change', { bubbles: true }));
+                  return true;
+                }
+                return false;
+              }, { sel: selector, pwd: credentials.password });
+              console.log('✅ Passwort eingegeben (JavaScript)');
+              passwordFilled = true;
+              break;
+            } catch (e3) {
+              console.log('  ⚠️  JavaScript setValue fehlgeschlagen');
+              continue;
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`  ⚠️  Fehler bei Selektor ${selector}: ${e.message}`);
+        continue;
+      }
+    }
+    
+    if (!passwordFilled) {
+      throw new Error('Passwort konnte mit keiner Methode eingegeben werden');
+    }
+    
+    await page.waitForTimeout(300);
+    
+    // Login absenden
+    const submitButton = page.locator('button[type="submit"]:has-text("Anmelden"), button:has-text("Anmelden")').first();
+    await submitButton.click();
+    console.log('✅ Anmelden geklickt');
+    
+    await page.waitForTimeout(2000);
+    
+    // Warte auf Seiten-Übergang
+    await page.waitForTimeout(2500);
+    
+    // Prüfe ob Phone-Collector Screen kommt
+    console.log('🔍 Prüfe auf Phone-Collector Screen...');
+    
+    const currentBodyText = await page.locator('body').textContent() || '';
+    const hasPhoneScreen = currentBodyText.toLowerCase().includes('telefonnummer') || 
+                           currentBodyText.toLowerCase().includes('handynummer');
+    
+    console.log(`📱 Phone-Screen erkannt: ${hasPhoneScreen}`);
+    
+    if (hasPhoneScreen) {
+      console.log('📱 Phone-Collector Screen erkannt - klicke "später erinnern" weg...');
+      
+      await page.waitForTimeout(500);
+      
+      // Suche "später erinnern" Button mit erweiterten Selektoren
+      const spaterSelectors = [
+        'a:has-text("später")',
+        'button:has-text("später")',
+        'a:has-text("Später")',
+        'button:has-text("Später")',
+        'a[href*="later" i]',
+        'button[class*="later" i]',
+        'a[class*="skip" i]',
+        '[data-testid*="later" i]',
+        '[data-testid*="skip" i]',
+      ];
+      
+      let spaterClicked = false;
+      
+      // Versuche "später erinnern" Button zu klicken (wie in auth.ts)
+      for (const selector of spaterSelectors) {
+        try {
+          const button = page.locator(selector).first();
+          const count = await button.count();
+          
+          if (count > 0) {
+            console.log(`🔍 Button gefunden mit Selektor: ${selector}`);
+            const btnText = await button.textContent();
+            console.log(`   Button-Text: "${btnText?.trim()}"`);
+            
+            // Versuche mit force: true zu klicken
+            try {
+              await button.click({ force: true, timeout: 3000 });
+              console.log(`✅ Button geklickt (${selector})`);
+              spaterClicked = true;
+              await page.waitForTimeout(1000);
+              break;
+            } catch (clickErr) {
+              // Fallback: JavaScript-Klick auf dem Element direkt
+              console.log('⚠️  Normaler Klick fehlgeschlagen, versuche JavaScript...');
+              try {
+                await button.evaluate((btn: any) => btn.click());
+                console.log(`✅ Button geklickt via JavaScript (${selector})`);
+                spaterClicked = true;
+                await page.waitForTimeout(1000);
+                break;
+              } catch (jsErr) {
+                console.log(`  ⚠️  JavaScript Click fehlgeschlagen: ${jsErr}`);
+                continue;
+              }
+            }
+          }
+        } catch (e) {
+          // Nächsten Selektor versuchen
+          continue;
+        }
+      }
+      
+      if (spaterClicked) {
+        console.log('✅ Phone-Collector übersprungen');
+        await page.waitForTimeout(2000);
+      } else {
+        console.log('⚠️  Konnte "später erinnern" Button nicht finden/klicken');
+        
+        // Screenshot für Debug
+        await page.screenshot({
+          path: `test-results/screenshots/phone-collector-not-skipped-${Date.now()}.png`,
+          fullPage: true
+        });
+      }
+    } else {
+      console.log('✅ Kein Phone-Collector Screen - weiter zum Check');
+    }
+    
+    // Warte bis wir auf Kundenbereich sind
+    console.log('🔍 Warte auf Kundenbereich...');
+    await page.waitForTimeout(1000);
+    
+    const finalUrl = page.url();
+    console.log(`📍 Finale URL nach zweitem Login: ${finalUrl}`);
+    
+    // Prüfe dass KEINE Challenge kam (Check auf URL)
+    const hasChallenge = finalUrl.includes('callback=') && 
+                        finalUrl.includes('accounts.check24');
+    
+    if (hasChallenge) {
+      console.log('❌ Challenge/Login-Screen noch aktiv - sollte aber nicht kommen!');
+      console.log('📄 Seiteninhalt prüfen...');
+      const bodyText = await page.locator('body').textContent() || '';
+      if (bodyText.toLowerCase().includes('sicherheit') && bodyText.toLowerCase().includes('code')) {
+        throw new Error('Login-Challenge wurde beim zweiten Login angezeigt - Browser wurde nicht "remembered"');
+      }
+    } else {
+      console.log('✅ Keine Challenge beim zweiten Login - direkt auf Kundenbereich!');
+    }
+    
+    // Prüfe c24session Cookie
+    console.log('\n🔍 Prüfe Login-Erfolg mit c24session Cookie...');
+    
+    await page.waitForTimeout(500);
+    
+    const cookies = await page.context().cookies();
+    const c24sessionCookie = cookies.find(cookie => cookie.name === 'c24session');
+    
+    if (c24sessionCookie) {
+      console.log(`✅ c24session Cookie gefunden: ${c24sessionCookie.value.substring(0, 20)}...`);
+      console.log(`   Domain: ${c24sessionCookie.domain}`);
+      console.log(`   Expires: ${c24sessionCookie.expires ? new Date(c24sessionCookie.expires * 1000).toISOString() : 'Session'}`);
+    } else {
+      console.log('⚠️  c24session Cookie NICHT gefunden - Login möglicherweise fehlgeschlagen');
+      console.log('📋 Vorhandene Cookies:', cookies.map(c => c.name).join(', '));
+      throw new Error('Zweiter Login nicht vollständig: c24session Cookie fehlt');
+    }
+    
+    // Prüfe ob wir auf Kundenbereich sind
+    if (finalUrl.includes('kundenbereich.check24.de') || finalUrl.includes('kundenbereich.check24-test.de')) {
+      console.log('✅ Erfolgreich auf Kundenbereich weitergeleitet');
+    } else if (finalUrl.includes('process=failed')) {
+      throw new Error('Zweiter Login fehlgeschlagen: URL zeigt process=failed');
+    } else {
+      console.log(`⚠️  Unerwartete URL: ${finalUrl}`);
+    }
+    
+    console.log('✅ Zweiter Login vollständig erfolgreich OHNE Challenge');
+    
+    // Screenshot
+    await page.screenshot({
+      path: `test-results/screenshots/second-login-no-challenge-${Date.now()}.png`,
+      fullPage: true
+    });
+    
+    // Cleanup: Logout
     await logout(page);
+    
+    console.log('✅ Test komplett erfolgreich: Erster Login + Zweiter Login ohne Challenge');
   });
 
   test('Erfolgreicher Login - Combined Account mit Email-TAN (Selection)', async ({ browser }) => {

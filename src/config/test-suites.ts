@@ -15,8 +15,8 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     id: 'login-happy',
     name: 'Login - Passwort Login inklusive Login Challenge',
     path: 'tests/login/password-happy-path.spec.ts',
-    description: 'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: E-Mail only Account (TAN per E-Mail)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)\n\n• Test 4: Combined Account with 2FA enabled (Keine Login Challenge)',
-    testCount: 4,
+    description: 'Vollständiger Passwort Login-Flow inklusive Testing vollständiger Login Challenge\n\n• Test 1: Erster Login + Zweiter Login ohne Challenge (E-Mail only Account, TAN per E-Mail, dann Abmelden & erneut Anmelden ohne Challenge)\n\n• Test 2: Combined Account (TAN per E-Mail)\n\n• Test 3: Combined Account (TAN per SMS)\n\n• Test 4: 2FA Account (SMS-TAN)\n\n• Test 5: Login-Seite lädt korrekt\n\n• Test 6: Login-Formular ist interaktiv',
+    testCount: 6,
   },
   {
     id: 'login-otp',
