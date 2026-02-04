@@ -81,12 +81,13 @@ export default function TestRunDetailsPage() {
       const res = await axios.post(`/api/test-runs/${params.id}/stop`);
       
       if (res.data.success) {
-        alert('✅ Test wurde gestoppt');
+        alert(`✅ ${res.data.message || 'Test wurde erfolgreich gestoppt'}`);
         await fetchDetails(); // Aktualisiere Details
       }
     } catch (err: any) {
       console.error('Fehler beim Stoppen:', err);
-      alert(err.response?.data?.error || 'Fehler beim Stoppen des Tests');
+      const errorMsg = err.response?.data?.error || 'Fehler beim Stoppen des Tests';
+      alert(`❌ ${errorMsg}`);
     } finally {
       setStopping(false);
     }

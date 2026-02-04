@@ -706,45 +706,55 @@ export class PlaywrightRunner {
     
     console.log(`📝 Test-Status: ${testRun.status}, PID: ${testRun.processPid || 'keine'}`);
     
-    if (!testRun.processPid) {
-      console.log(`⚠️  Keine Prozess-PID für Run-ID ${runId} gefunden`);
+    // Wenn Test bereits beendet ist
+    if (testRun.status === 'passed' || testRun.status === 'failed' || testRun.status === 'cancelled' || testRun.status === 'timeout') {
+      console.log(`⚠️  Test ${runId} ist bereits beendet (Status: ${testRun.status})`);
       return false;
     }
     
-    console.log(`🛑 Stoppe Test mit Run-ID ${runId} (PID: ${testRun.processPid})...`);
-    
     try {
-      // Prüfe ob Prozess existiert
-      try {
-        process.kill(testRun.processPid, 0); // Signal 0 prüft nur Existenz
-      } catch (e) {
-        console.log(`⚠️  Prozess ${testRun.processPid} existiert nicht mehr`);
-        this.db.updateTestRun(runId, { processPid: null });
-        return false;
+      let processKilled = false;
+      
+      // Versuche Prozess zu killen falls PID vorhanden
+      if (testRun.processPid) {
+        console.log(`🛑 Stoppe Test mit Run-ID ${runId} (PID: ${testRun.processPid})...`);
+        
+        try {
+          // Prüfe ob Prozess existiert
+          process.kill(testRun.processPid, 0); // Signal 0 prüft nur Existenz
+          console.log(`✅ Prozess ${testRun.processPid} existiert, sende SIGTERM...`);
+          
+          // Sende SIGTERM zum sauberen Beenden (schließt auch alle Browser)
+          process.kill(testRun.processPid, 'SIGTERM');
+          console.log(`📤 SIGTERM gesendet an PID ${testRun.processPid}`);
+          
+          // Falls nach 3 Sekunden noch nicht beendet, forciere SIGKILL
+          setTimeout(() => {
+            try {
+              process.kill(testRun.processPid!, 0); // Prüfe ob noch läuft
+              console.log(`⚠️  Prozess ${testRun.processPid} reagiert nicht, sende SIGKILL...`);
+              process.kill(testRun.processPid!, 'SIGKILL');
+            } catch (e) {
+              // Prozess ist bereits beendet
+              console.log(`✅ Prozess ${testRun.processPid} bereits beendet`);
+            }
+          }, 3000);
+          
+          processKilled = true;
+        } catch (e) {
+          console.log(`⚠️  Prozess ${testRun.processPid} existiert nicht mehr`);
+        }
+      } else {
+        console.log(`ℹ️  Keine PID vorhanden, markiere Test als gestoppt`);
       }
       
-      // Sende SIGTERM zum sauberen Beenden (schließt auch alle Browser)
-      process.kill(testRun.processPid, 'SIGTERM');
-      console.log(`📤 SIGTERM gesendet an PID ${testRun.processPid}`);
-      
-      // Falls nach 5 Sekunden noch nicht beendet, forciere SIGKILL
-      setTimeout(() => {
-        try {
-          process.kill(testRun.processPid!, 0); // Prüfe ob noch läuft
-          console.log(`⚠️  Prozess ${testRun.processPid} reagiert nicht, sende SIGKILL...`);
-          process.kill(testRun.processPid!, 'SIGKILL');
-        } catch (e) {
-          // Prozess ist bereits beendet
-          console.log(`✅ Prozess ${testRun.processPid} bereits beendet`);
-        }
-      }, 5000);
-      
-      // Aktualisiere Status in Datenbank
+      // Aktualisiere Status in Datenbank (IMMER, auch wenn kein Prozess gekillt wurde)
       this.db.updateTestRun(runId, {
         status: 'cancelled',
         endTime: new Date().toISOString(),
         errorMessage: 'Test wurde manuell gestoppt',
         processPid: null,
+        progress: testRun.progress || 0, // Behalte aktuellen Progress
       });
       
       // Event für Live-Logs
@@ -756,11 +766,25 @@ export class PlaywrightRunner {
       });
       testLogEmitter.emit('complete', { runId });
       
-      console.log(`✅ Test ${runId} erfolgreich gestoppt`);
+      console.log(`✅ Test ${runId} erfolgreich gestoppt${processKilled ? ' und Prozess gekillt' : ''}`);
       return true;
     } catch (error) {
       console.error(`❌ Fehler beim Stoppen von Test ${runId}:`, error);
-      return false;
+      
+      // Auch bei Fehler: Setze Status auf cancelled
+      try {
+        this.db.updateTestRun(runId, {
+          status: 'cancelled',
+          endTime: new Date().toISOString(),
+          errorMessage: 'Test wurde gestoppt (mit Fehler)',
+          processPid: null,
+        });
+        console.log(`✅ Status auf 'cancelled' gesetzt trotz Fehler beim Kill`);
+        return true;
+      } catch (dbError) {
+        console.error(`❌ Konnte Status nicht aktualisieren:`, dbError);
+        return false;
+      }
     }
   }
 }

@@ -495,10 +495,18 @@ app.post('/api/test-runs/:id/stop', async (req, res) => {
       });
     }
     
+    if (testRun.status === 'cancelled') {
+      return res.json({
+        success: true,
+        message: 'Test wurde bereits gestoppt',
+        data: { runId },
+      });
+    }
+    
     if (testRun.status !== 'running' && testRun.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        error: 'Test läuft nicht mehr',
+        error: `Test kann nicht gestoppt werden (Status: ${testRun.status})`,
       });
     }
     
@@ -508,15 +516,16 @@ app.post('/api/test-runs/:id/stop', async (req, res) => {
     if (stopped) {
       res.json({
         success: true,
-        message: 'Test wurde gestoppt',
+        message: 'Test wurde erfolgreich gestoppt',
         data: {
           runId,
+          status: 'cancelled',
         },
       });
     } else {
       res.status(500).json({
         success: false,
-        error: 'Test konnte nicht gestoppt werden',
+        error: 'Test konnte nicht gestoppt werden - siehe Server-Logs für Details',
       });
     }
   } catch (error: any) {
