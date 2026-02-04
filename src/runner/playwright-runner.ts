@@ -46,6 +46,17 @@ export class PlaywrightRunner {
   private slackNotifier = getSlackNotifier();
 
   /**
+   * Prüft ob Slack-Benachrichtigungen gesendet werden sollen
+   * NUR bei Fehlern auf PROD Environment
+   */
+  private shouldSendSlackNotification(): boolean {
+    const env = process.env.TEST_ENVIRONMENT?.toLowerCase();
+    // Slack nur auf PROD (wenn TEST_ENVIRONMENT nicht gesetzt ist oder explizit 'prod')
+    const isProd = !env || env === 'prod';
+    return isProd;
+  }
+
+  /**
    * Führt Playwright-Tests aus
    */
   async runTests(options: TestRunOptions): Promise<TestResult[]> {
@@ -230,13 +241,16 @@ export class PlaywrightRunner {
           errorMessage,
         });
 
-        // Slack-Benachrichtigung
+        // Slack-Benachrichtigung (NUR auf PROD Environment)
         const testRun = this.db.getTestRun(runId);
-        if (testRun) {
+        if (testRun && this.shouldSendSlackNotification()) {
+          console.log('📧 Sende Slack-Benachrichtigung für fehlgeschlagenen Test (PROD Environment)');
           const notified = await this.slackNotifier.notifyTestFailure({ testRun });
           if (notified) {
             this.db.updateTestRun(runId, { slackNotified: true });
           }
+        } else if (testRun && !this.shouldSendSlackNotification()) {
+          console.log('⏭️  Slack-Benachrichtigung übersprungen (TEST Environment)');
         }
       }
 
@@ -672,11 +686,21 @@ export class PlaywrightRunner {
   private async notifyFailures(results: TestResult[]): Promise<void> {
     const failures = results.filter(r => !r.success);
 
+    // Prüfe ob Slack-Benachrichtigungen gesendet werden sollen (NUR auf PROD)
+    if (!this.shouldSendSlackNotification()) {
+      if (failures.length > 0) {
+        console.log(`⏭️  ${failures.length} fehlgeschlagene Test(s) - Slack-Benachrichtigungen übersprungen (TEST Environment)`);
+      }
+      return;
+    }
+
     for (const failure of failures) {
       const testRun = this.db.getTestRun(failure.runId);
       
       if (testRun && !testRun.slackNotified) {
         let notified = false;
+        
+        console.log(`📧 Sende Slack-Benachrichtigung für Test: ${testRun.testName} (PROD Environment)`);
         
         // Unterscheide zwischen Timeout und regulärem Fehler
         if (testRun.status === 'timeout') {
