@@ -272,6 +272,7 @@ export class PlaywrightRunner {
           TEST_ENVIRONMENT: options?.environment || 'prod',
         },
         shell: true,
+        detached: true, // Erstelle neue Prozessgruppe (wichtig für korrektes Beenden aller Kindprozesse)
       });
 
       // Speichere PID in Datenbank für späteren Stop
@@ -722,18 +723,35 @@ export class PlaywrightRunner {
         try {
           // Prüfe ob Prozess existiert
           process.kill(testRun.processPid, 0); // Signal 0 prüft nur Existenz
-          console.log(`✅ Prozess ${testRun.processPid} existiert, sende SIGTERM...`);
+          console.log(`✅ Prozess ${testRun.processPid} existiert, sende SIGTERM zur Prozessgruppe...`);
           
-          // Sende SIGTERM zum sauberen Beenden (schließt auch alle Browser)
-          process.kill(testRun.processPid, 'SIGTERM');
-          console.log(`📤 SIGTERM gesendet an PID ${testRun.processPid}`);
+          // Sende SIGTERM zur GESAMTEN Prozessgruppe (negative PID)
+          // Dies killt npm UND alle Kindprozesse (Playwright, Browser, etc.)
+          try {
+            process.kill(-testRun.processPid, 'SIGTERM');
+            console.log(`📤 SIGTERM gesendet an Prozessgruppe -${testRun.processPid}`);
+          } catch (e: any) {
+            // Fallback: Versuche einzelnen Prozess zu killen
+            console.log(`⚠️  Prozessgruppe konnte nicht gekillt werden (${e.message}), versuche einzelnen Prozess...`);
+            process.kill(testRun.processPid, 'SIGTERM');
+            console.log(`📤 SIGTERM gesendet an einzelnen Prozess ${testRun.processPid}`);
+          }
           
-          // Falls nach 3 Sekunden noch nicht beendet, forciere SIGKILL
+          // Falls nach 3 Sekunden noch nicht beendet, forciere SIGKILL auf Prozessgruppe
           setTimeout(() => {
             try {
               process.kill(testRun.processPid!, 0); // Prüfe ob noch läuft
-              console.log(`⚠️  Prozess ${testRun.processPid} reagiert nicht, sende SIGKILL...`);
-              process.kill(testRun.processPid!, 'SIGKILL');
+              console.log(`⚠️  Prozess ${testRun.processPid} reagiert nicht, sende SIGKILL zur Prozessgruppe...`);
+              
+              try {
+                process.kill(-testRun.processPid!, 'SIGKILL');
+                console.log(`💀 SIGKILL gesendet an Prozessgruppe -${testRun.processPid}`);
+              } catch (e: any) {
+                // Fallback: Force-Kill einzelnen Prozess
+                console.log(`⚠️  Prozessgruppe SIGKILL fehlgeschlagen, versuche einzelnen Prozess...`);
+                process.kill(testRun.processPid!, 'SIGKILL');
+                console.log(`💀 SIGKILL gesendet an einzelnen Prozess ${testRun.processPid}`);
+              }
             } catch (e) {
               // Prozess ist bereits beendet
               console.log(`✅ Prozess ${testRun.processPid} bereits beendet`);
