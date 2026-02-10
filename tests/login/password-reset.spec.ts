@@ -109,18 +109,18 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // TAN-Code extrahieren
       console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
-      console.log(`   Betreff: ${email.subject}`);
-      console.log(`   Body (erste 200 Zeichen): ${email.body.substring(0, 200)}`);
+      console.log(`   Betreff: ${email!.subject}`);
+      console.log(`   Body (erste 200 Zeichen): ${email!.body.substring(0, 200)}`);
 
       // TAN aus Betreff extrahieren (z.B. "123456 ist Ihr CHECK24 Sicherheitscode")
       let tanCode: string | null = null;
-      const subjectMatch = email.subject.match(/(\d{6})/);
+      const subjectMatch = email!.subject.match(/(\d{6})/);
       if (subjectMatch) {
         tanCode = subjectMatch[1];
         console.log(`✅ TAN-Code extrahiert aus Betreff: ${tanCode}`);
       } else {
         // Fallback: Aus Body extrahieren
-        const bodyMatch = email.body.match(/(\d{6})/);
+        const bodyMatch = email!.body.match(/(\d{6})/);
         if (bodyMatch) {
           tanCode = bodyMatch[1];
           console.log(`✅ TAN-Code extrahiert aus Body: ${tanCode}`);
@@ -266,7 +266,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           2000
         );
         
-        console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail.subject}"`);
+        console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail!.subject}"`);
       } catch (e) {
         console.warn('⚠️  Bestätigungsmail nicht innerhalb von 30 Sekunden erhalten - fahre trotzdem fort');
         await sendEmailTimeoutWarning(
@@ -523,18 +523,18 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // TAN-Code extrahieren
       console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
-      console.log(`   Betreff: ${email.subject}`);
-      console.log(`   Body (erste 200 Zeichen): ${email.body.substring(0, 200)}`);
+      console.log(`   Betreff: ${email!.subject}`);
+      console.log(`   Body (erste 200 Zeichen): ${email!.body.substring(0, 200)}`);
 
       // TAN aus Betreff extrahieren (z.B. "123456 ist Ihr CHECK24 Sicherheitscode")
       let tanCode: string | null = null;
-      const subjectMatch = email.subject.match(/(\d{6})/);
+      const subjectMatch = email!.subject.match(/(\d{6})/);
       if (subjectMatch) {
         tanCode = subjectMatch[1];
         console.log(`✅ TAN-Code extrahiert aus Betreff: ${tanCode}`);
       } else {
         // Fallback: Aus Body extrahieren
-        const bodyMatch = email.body.match(/(\d{6})/);
+        const bodyMatch = email!.body.match(/(\d{6})/);
         if (bodyMatch) {
           tanCode = bodyMatch[1];
           console.log(`✅ TAN-Code extrahiert aus Body: ${tanCode}`);
@@ -660,7 +660,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           2000
         );
         
-        console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail.subject}"`);
+        console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail!.subject}"`);
       } catch (e) {
         console.warn('⚠️  Bestätigungsmail nicht innerhalb von 30 Sekunden erhalten - fahre trotzdem fort');
         await sendEmailTimeoutWarning(
@@ -944,7 +944,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           2000
         );
         
-        console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail.subject}"`);
+        console.log(`✅ Bestätigungsmail erhalten: "${confirmationEmail!.subject}"`);
       } catch (e) {
         console.warn('⚠️  Bestätigungsmail nicht innerhalb von 30 Sekunden erhalten - fahre trotzdem fort');
         await sendEmailTimeoutWarning(
@@ -1112,16 +1112,16 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // TAN-Code extrahieren
       console.log('🔍 Extrahiere ersten TAN-Code aus E-Mail...');
-      console.log(`   Betreff: ${email.subject}`);
-      console.log(`   Body (erste 200 Zeichen): ${email.body.substring(0, 200)}`);
+      console.log(`   Betreff: ${email!.subject}`);
+      console.log(`   Body (erste 200 Zeichen): ${email!.body.substring(0, 200)}`);
 
       let tanCode: string | null = null;
-      const subjectMatch = email.subject.match(/(\d{6})/);
+      const subjectMatch = email!.subject.match(/(\d{6})/);
       if (subjectMatch) {
         tanCode = subjectMatch[1];
         console.log(`✅ Erster TAN-Code extrahiert aus Betreff: ${tanCode}`);
       } else {
-        const bodyMatch = email.body.match(/(\d{6})/);
+        const bodyMatch = email!.body.match(/(\d{6})/);
         if (bodyMatch) {
           tanCode = bodyMatch[1];
           console.log(`✅ Erster TAN-Code extrahiert aus Body: ${tanCode}`);
@@ -1522,15 +1522,15 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // TAN-Code extrahieren
       console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
-      console.log(`   Betreff: ${email.subject}`);
+      console.log(`   Betreff: ${email!.subject}`);
 
       let tanCode: string | null = null;
-      const subjectMatch = email.subject.match(/(\d{6})/);
+      const subjectMatch = email!.subject.match(/(\d{6})/);
       if (subjectMatch) {
         tanCode = subjectMatch[1];
         console.log(`✅ TAN-Code extrahiert aus Betreff: ${tanCode}`);
       } else {
-        const bodyMatch = email.body.match(/(\d{6})/);
+        const bodyMatch = email!.body.match(/(\d{6})/);
         if (bodyMatch) {
           tanCode = bodyMatch[1];
           console.log(`✅ TAN-Code extrahiert aus Body: ${tanCode}`);
