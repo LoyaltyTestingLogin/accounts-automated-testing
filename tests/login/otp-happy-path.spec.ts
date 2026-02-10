@@ -524,7 +524,6 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
         await page.waitForTimeout(1000);
       }
       
-      // Debug: Prüfe aktuelle URL
       console.log(`📍 Finale URL nach SMS-Login: ${page.url()}`);
       console.log(`📄 Seitentitel: ${await page.title()}`);
 

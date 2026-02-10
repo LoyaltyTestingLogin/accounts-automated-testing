@@ -1394,4 +1394,850 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
     }
   });
 
+  test('Passwort-Reset mit IBAN-Verifizierung - 2FA Account', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    
+    try {
+      // Account mit E-Mail + Phone + 2FA verwenden
+      const credentials = getAccountCredentials('EMAIL_PHONE_2FA');
+      console.log(`🔐 Verwende Test-Account: ${credentials.account.description}`);
+      console.log(`📧 E-Mail: ${credentials.account.email}`);
+      console.log(`📱 Phone: ${credentials.account.phone}`);
+      console.log(`🏦 IBAN-Verifizierung Test`);
+
+      // Zur Login-Seite navigieren
+      const loginUrl = getLoginUrl();
+      console.log(`🌍 Umgebung: ${process.env.TEST_ENVIRONMENT || 'PROD'} - ${loginUrl}`);
+      await page.goto(loginUrl);
+      await page.waitForLoadState('networkidle');
+
+      // SCHRITT 1: E-Mail eingeben
+      console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
+      const emailInput = page.locator('#cl_login');
+      await emailInput.waitFor({ state: 'visible', timeout: 10000 });
+      await page.waitForTimeout(300);
+      await emailInput.fill(credentials.email);
+      await page.waitForTimeout(500);
+      
+      // "Weiter" klicken
+      console.log('➡️  Klicke auf "Weiter"-Button...');
+      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      await weiterButton.click();
+      console.log('✅ "Weiter" wurde geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 2: "Passwort vergessen?" klicken
+      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
+      
+      const forgotPasswordSelectors = [
+        'a:has-text("Passwort vergessen?")',
+        'button:has-text("Passwort vergessen?")',
+        '[data-tid*="forgot"]',
+        'a:has-text("Passwort")',
+      ];
+
+      let forgotPasswordLink = null;
+      for (const selector of forgotPasswordSelectors) {
+        const element = page.locator(selector).first();
+        if (await element.count() > 0) {
+          const isVisible = await element.isVisible().catch(() => false);
+          if (isVisible) {
+            forgotPasswordLink = element;
+            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
+            break;
+          }
+        }
+      }
+
+      if (!forgotPasswordLink) {
+        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
+      }
+
+      await forgotPasswordLink.click();
+      console.log('✅ "Passwort vergessen?" geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 3: Selection Screen - E-Mail sollte bereits ausgewählt sein
+      console.log('🔍 SCHRITT 3: Prüfe auf Selection Screen...');
+      await page.waitForTimeout(500);
+      
+      const emailRadio = page.locator('#c24-uli-choose-email');
+      const hasEmailOption = await emailRadio.count() > 0;
+
+      if (hasEmailOption) {
+        console.log('✅ Selection Screen erkannt - E-Mail sollte bereits ausgewählt sein');
+        
+        // Prüfe ob E-Mail bereits ausgewählt ist
+        const isChecked = await emailRadio.isChecked().catch(() => false);
+        console.log(`📧 E-Mail Radio Button already checked: ${isChecked}`);
+        
+        if (!isChecked) {
+          console.log('🔘 E-Mail ist nicht ausgewählt, wähle jetzt...');
+          try {
+            await emailRadio.click({ timeout: 1500 });
+            console.log('✅ E-Mail Radio Button geklickt');
+          } catch (e) {
+            await emailRadio.click({ force: true });
+            console.log('✅ E-Mail Radio Button geklickt (force)');
+          }
+        }
+      } else {
+        console.log('ℹ️  Kein Selection Screen erkannt - überspringe Auswahl');
+      }
+
+      // SCHRITT 4: "Code senden" klicken
+      console.log('📧 SCHRITT 4: Klicke "Code senden"...');
+      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
+      await codeSendenButton.click();
+      console.log('✅ "Code senden" wurde geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // E-Mail Client initialisieren
+      const emailClient = getEmailClient();
+
+      // SCHRITT 5: TAN-Code aus E-Mail holen
+      console.log('📧 SCHRITT 5: Warte auf TAN-Code per E-Mail...');
+      
+      let email;
+      try {
+        email = await emailClient.waitForEmail(
+          {
+            subject: 'CHECK24',
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset IBAN - TAN-Code',
+          'subject: CHECK24',
+          120
+        );
+        throw error;
+      }
+
+      // TAN-Code extrahieren
+      console.log('🔍 Extrahiere TAN-Code aus E-Mail...');
+      console.log(`   Betreff: ${email.subject}`);
+
+      let tanCode: string | null = null;
+      const subjectMatch = email.subject.match(/(\d{6})/);
+      if (subjectMatch) {
+        tanCode = subjectMatch[1];
+        console.log(`✅ TAN-Code extrahiert aus Betreff: ${tanCode}`);
+      } else {
+        const bodyMatch = email.body.match(/(\d{6})/);
+        if (bodyMatch) {
+          tanCode = bodyMatch[1];
+          console.log(`✅ TAN-Code extrahiert aus Body: ${tanCode}`);
+        } else {
+          throw new Error('Konnte TAN-Code nicht aus E-Mail extrahieren');
+        }
+      }
+
+      console.log(`🔑 TAN-Code erhalten: ${tanCode}`);
+
+      // SCHRITT 6: TAN-Code eingeben und Enter drücken
+      console.log('🔍 SCHRITT 6: Suche TAN-Eingabefeld...');
+      
+      let tanInput = null;
+      const inputSelectors = ['input[type="text"]', 'input[type="tel"]', 'input[id*="tan"]'];
+      
+      for (const selector of inputSelectors) {
+        const inputs = await page.locator(selector).all();
+        for (const input of inputs) {
+          const isVisible = await input.isVisible().catch(() => false);
+          if (isVisible) {
+            tanInput = input;
+            console.log(`✅ TAN-Eingabefeld gefunden mit ${selector}`);
+            break;
+          }
+        }
+        if (tanInput) break;
+      }
+
+      if (!tanInput) {
+        throw new Error('Konnte TAN-Eingabefeld nicht finden');
+      }
+
+      await page.waitForTimeout(500);
+      await tanInput.fill(tanCode);
+      console.log('✅ TAN-Code eingegeben');
+      
+      // Enter drücken
+      await tanInput.press('Enter');
+      console.log('✅ Enter gedrückt');
+
+      // SCHRITT 7: Warte auf Phone-TAN Screen
+      console.log('⏳ SCHRITT 7: Warte auf Phone-TAN Screen...');
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 8: Klicke auf "auf andere Art bestätigen" Link/Button
+      console.log('🔍 SCHRITT 8: Suche "auf andere Art bestätigen" Link...');
+      
+      const alternativeAuthSelectors = [
+        'a:has-text("auf andere Art bestätigen")',
+        'button:has-text("auf andere Art bestätigen")',
+        'a:has-text("andere Art")',
+        'button:has-text("andere Art")',
+      ];
+
+      let alternativeAuthLink = null;
+      for (const selector of alternativeAuthSelectors) {
+        try {
+          const elements = await page.locator(selector).all();
+          
+          for (const element of elements) {
+            const text = await element.textContent().catch(() => '');
+            const isVisible = await element.isVisible().catch(() => false);
+            
+            if (text && text.toLowerCase().includes('andere art') && isVisible) {
+              alternativeAuthLink = element;
+              console.log(`✅ Alternative Auth Link gefunden: "${text.trim()}"`);
+              break;
+            }
+          }
+          
+          if (alternativeAuthLink) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!alternativeAuthLink) {
+        throw new Error('Konnte "auf andere Art bestätigen" Link/Button nicht finden');
+      }
+
+      await alternativeAuthLink.click();
+      console.log('✅ "auf andere Art bestätigen" geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 9: IBAN-Eingabefeld finden und IBAN eingeben
+      console.log('🏦 SCHRITT 9: Suche IBAN-Eingabefeld...');
+      await page.waitForLoadState('networkidle', { timeout: 10000 });
+      await page.waitForTimeout(1000);
+
+      const ibanSelectors = [
+        'input[name*="iban"]',
+        'input[id*="iban"]',
+        'input[placeholder*="IBAN"]',
+        'input[placeholder*="iban"]',
+        'input[type="text"]',
+      ];
+
+      let ibanInput = null;
+      for (const selector of ibanSelectors) {
+        try {
+          const inputs = await page.locator(selector).all();
+          for (const input of inputs) {
+            const isVisible = await input.isVisible().catch(() => false);
+            if (isVisible) {
+              ibanInput = input;
+              console.log(`✅ IBAN-Eingabefeld gefunden mit: ${selector}`);
+              break;
+            }
+          }
+          if (ibanInput) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!ibanInput) {
+        throw new Error('Konnte IBAN-Eingabefeld nicht finden');
+      }
+
+      // IBAN eingeben (hart gecoded)
+      const iban = 'DE57370502990101508141';
+      console.log(`🏦 Gebe IBAN ein: ${iban}`);
+      
+      await page.waitForTimeout(500);
+      await ibanInput.fill(iban);
+      console.log('✅ IBAN eingegeben');
+
+      await page.waitForTimeout(1000);
+
+      // SCHRITT 10: "Weiter" Button nach IBAN-Eingabe klicken
+      console.log('➡️  SCHRITT 10: Suche "Weiter" Button nach IBAN-Eingabe...');
+      
+      const weiterButtonIbanSelectors = [
+        'button[type="submit"]:has-text("weiter")',
+        'button[type="submit"]:has-text("Weiter")',
+        'button:has-text("weiter")',
+        'button:has-text("Weiter")',
+        'button[type="submit"]',
+      ];
+
+      let weiterButtonIban = null;
+      for (const selector of weiterButtonIbanSelectors) {
+        try {
+          const buttons = await page.locator(selector).all();
+          
+          for (const btn of buttons) {
+            const isVisible = await btn.isVisible().catch(() => false);
+            if (isVisible) {
+              weiterButtonIban = btn;
+              break;
+            }
+          }
+          
+          if (weiterButtonIban) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!weiterButtonIban) {
+        throw new Error('Konnte "Weiter" Button nach IBAN-Eingabe nicht finden');
+      }
+
+      try {
+        await weiterButtonIban.click({ timeout: 3000 });
+        console.log('✅ "Weiter" Button geklickt');
+      } catch (e) {
+        await weiterButtonIban.click({ force: true });
+        console.log('✅ "Weiter" Button geklickt (force)');
+      }
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 11: Warte auf nächsten Screen und klicke wieder auf "Weiter"
+      console.log('⏳ SCHRITT 11: Warte auf nächsten Screen...');
+      await page.waitForLoadState('networkidle', { timeout: 10000 });
+      await page.waitForTimeout(1000);
+
+      console.log('➡️  SCHRITT 11: Suche finalen "Weiter" Button...');
+      
+      const finalWeiterSelectors = [
+        'button[type="submit"]:has-text("weiter")',
+        'button[type="submit"]:has-text("Weiter")',
+        'button:has-text("weiter")',
+        'button:has-text("Weiter")',
+        'button[type="submit"]',
+      ];
+
+      let finalWeiterButton = null;
+      for (const selector of finalWeiterSelectors) {
+        try {
+          const buttons = await page.locator(selector).all();
+          
+          for (const btn of buttons) {
+            const isVisible = await btn.isVisible().catch(() => false);
+            if (isVisible) {
+              finalWeiterButton = btn;
+              break;
+            }
+          }
+          
+          if (finalWeiterButton) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!finalWeiterButton) {
+        throw new Error('Konnte finalen "Weiter" Button nicht finden');
+      }
+
+      console.log('✅ Klicke finalen "Weiter" Button...');
+      
+      try {
+        await finalWeiterButton.click({ timeout: 3000 });
+        console.log('✅ Finaler "Weiter" Button geklickt');
+      } catch (e) {
+        await finalWeiterButton.click({ force: true });
+        console.log('✅ Finaler "Weiter" Button geklickt (force)');
+      }
+
+      // SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite (Kundenbereich)
+      console.log('⏳ SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite...');
+      await page.waitForLoadState('networkidle', { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      // Warte auf Kundenbereich URL
+      try {
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 10000 });
+        console.log('✅ Zum Kundenbereich weitergeleitet');
+      } catch (e) {
+        console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
+        await page.waitForTimeout(3000);
+      }
+
+      // SCHRITT 13: Prüfe c24session Cookie
+      console.log('🍪 SCHRITT 13: Prüfe c24session Cookie...');
+      
+      const finalUrl = page.url();
+      console.log(`📍 Finale URL: ${finalUrl}`);
+
+      // Alle Cookies holen
+      const allCookies = await page.context().cookies();
+      console.log(`📋 Alle Cookies (${allCookies.length}): ${allCookies.map(c => `${c.name} (Domain: ${c.domain})`).join(', ')}`);
+
+      // c24session Cookie(s) suchen
+      const c24sessionCookies = allCookies.filter(c => c.name === 'c24session');
+      
+      if (c24sessionCookies.length > 0) {
+        console.log(`✅ c24session Cookie(s) gefunden: ${c24sessionCookies.length}x`);
+        for (const cookie of c24sessionCookies) {
+          console.log(`   - ${cookie.value.substring(0, 20)}... (Domain: ${cookie.domain})`);
+        }
+      } else {
+        console.log('⚠️  c24session Cookie nicht gefunden');
+        
+        // Prüfe auf TEST Environment (Cookie-Check ist lenient)
+        const isTestEnvironment = finalUrl.includes('check24-test.de');
+        if (!isTestEnvironment) {
+          throw new Error('Login nicht vollständig: c24session Cookie fehlt (PROD)');
+        } else {
+          console.log('⚠️  TEST Environment - Cookie-Check lenient');
+        }
+      }
+
+      // Login-Erfolg verifizieren
+      await expectLoginSuccess(page);
+
+      console.log(`✅ Passwort-Reset mit IBAN-Verifizierung vollständig erfolgreich: ${credentials.email}`);
+
+      // Logout
+      await logout(page);
+      
+      console.log('✅ Test komplett erfolgreich abgeschlossen');
+
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('Passwort-Reset mit IBAN-Verifizierung via SMS - 2FA Account', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    
+    try {
+      // Account mit E-Mail + Phone + 2FA verwenden
+      const credentials = getAccountCredentials('EMAIL_PHONE_2FA');
+      console.log(`🔐 Verwende Test-Account: ${credentials.account.description}`);
+      console.log(`📧 E-Mail: ${credentials.account.email}`);
+      console.log(`📱 Phone: ${credentials.account.phone}`);
+      console.log(`🏦 IBAN-Verifizierung Test via SMS`);
+
+      // Zur Login-Seite navigieren
+      const loginUrl = getLoginUrl();
+      console.log(`🌍 Umgebung: ${process.env.TEST_ENVIRONMENT || 'PROD'} - ${loginUrl}`);
+      await page.goto(loginUrl);
+      await page.waitForLoadState('networkidle');
+
+      // SCHRITT 1: E-Mail eingeben
+      console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
+      const emailInput = page.locator('#cl_login');
+      await emailInput.waitFor({ state: 'visible', timeout: 10000 });
+      await page.waitForTimeout(300);
+      await emailInput.fill(credentials.email);
+      await page.waitForTimeout(500);
+      
+      // "Weiter" klicken
+      console.log('➡️  Klicke auf "Weiter"-Button...');
+      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      await weiterButton.click();
+      console.log('✅ "Weiter" wurde geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 2: "Passwort vergessen?" klicken
+      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
+      
+      const forgotPasswordSelectors = [
+        'a:has-text("Passwort vergessen?")',
+        'button:has-text("Passwort vergessen?")',
+        '[data-tid*="forgot"]',
+        'a:has-text("Passwort")',
+      ];
+
+      let forgotPasswordLink = null;
+      for (const selector of forgotPasswordSelectors) {
+        const element = page.locator(selector).first();
+        if (await element.count() > 0) {
+          const isVisible = await element.isVisible().catch(() => false);
+          if (isVisible) {
+            forgotPasswordLink = element;
+            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
+            break;
+          }
+        }
+      }
+
+      if (!forgotPasswordLink) {
+        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
+      }
+
+      await forgotPasswordLink.click();
+      console.log('✅ "Passwort vergessen?" geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 3: Selection Screen - SMS auswählen (statt E-Mail)
+      console.log('🔍 SCHRITT 3: Prüfe auf Selection Screen...');
+      await page.waitForTimeout(500);
+      
+      const smsRadio = page.locator('#c24-uli-choose-sms');
+      const hasSmsOption = await smsRadio.count() > 0;
+
+      if (hasSmsOption) {
+        console.log('✅ Selection Screen erkannt - wähle SMS...');
+        
+        // SMS Radio Button auswählen
+        try {
+          await smsRadio.click({ timeout: 1500 });
+          console.log('✅ SMS Radio Button geklickt (normal)');
+        } catch (e) {
+          console.log('⚠️  Normal-Click fehlgeschlagen, versuche force...');
+          try {
+            await smsRadio.click({ force: true });
+            console.log('✅ SMS Radio Button geklickt (force)');
+          } catch (e2) {
+            // Fallback: Klicke auf das Label
+            console.log('⚠️  Force-Click fehlgeschlagen, versuche Label...');
+            const smsLabel = page.locator('label[for="c24-uli-choose-sms"]');
+            await smsLabel.click({ force: true });
+            console.log('✅ SMS Label geklickt (force)');
+          }
+        }
+        
+        await page.waitForTimeout(300);
+        
+        // Verifiziere dass SMS ausgewählt ist
+        const isChecked = await smsRadio.isChecked().catch(() => false);
+        console.log(`📱 SMS Radio Button checked: ${isChecked}`);
+        
+        if (!isChecked) {
+          throw new Error('SMS Radio Button konnte nicht ausgewählt werden');
+        }
+      } else {
+        console.log('⚠️  Kein Selection Screen erkannt - überspringe Auswahl');
+      }
+
+      // SCHRITT 4: "Code senden" klicken - SMS wird versendet
+      console.log('📱 SCHRITT 4: Klicke "Code senden" - SMS wird versendet...');
+      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
+      await codeSendenButton.click();
+      console.log('✅ "Code senden" wurde geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // E-Mail Client initialisieren
+      const emailClient = getEmailClient();
+
+      // SCHRITT 5: SMS-Code aus weitergeleiteter E-Mail holen (iPhone-Weiterleitung)
+      console.log('📱 SCHRITT 5: Warte auf weitergeleitete SMS per E-Mail vom iPhone...');
+      console.log(`📱 SMS wird an ${credentials.account.phone} gesendet`);
+      
+      let smsEmail;
+      try {
+        smsEmail = await emailClient.waitForEmail(
+          {
+            from: 'ulitesting@icloud.com', // iPhone-Weiterleitung
+          },
+          120000,
+          3000
+        );
+      } catch (error) {
+        await sendEmailTimeoutWarning(
+          'Passwort-Reset IBAN SMS - TAN-Code',
+          'from: ulitesting@icloud.com',
+          120
+        );
+        throw error;
+      }
+
+      if (!smsEmail) {
+        throw new Error('SMS-Weiterleitungs-E-Mail vom iPhone nicht erhalten');
+      }
+
+      console.log(`✅ SMS-Weiterleitungs-Email erhalten von: ${smsEmail.from}`);
+      console.log(`📧 Betreff: ${smsEmail.subject}`);
+
+      const smsCode = emailClient.extractTanCode(smsEmail);
+      if (!smsCode) {
+        throw new Error('SMS-Code konnte nicht extrahiert werden');
+      }
+
+      console.log(`🔑 SMS-Code erhalten: ${smsCode}`);
+
+      // SCHRITT 6: SMS-Code eingeben und Enter drücken
+      console.log('🔍 SCHRITT 6: Suche SMS-Eingabefeld...');
+      
+      let smsInput = null;
+      const smsInputSelectors = ['input[type="tel"]', 'input[type="text"]', 'input[id*="tan"]'];
+      
+      for (const selector of smsInputSelectors) {
+        const inputs = await page.locator(selector).all();
+        for (const input of inputs) {
+          const isVisible = await input.isVisible().catch(() => false);
+          if (isVisible) {
+            smsInput = input;
+            console.log(`✅ SMS-Eingabefeld gefunden mit ${selector}`);
+            break;
+          }
+        }
+        if (smsInput) break;
+      }
+
+      if (!smsInput) {
+        throw new Error('SMS-Eingabefeld nicht gefunden');
+      }
+
+      await page.waitForTimeout(500);
+      await smsInput.fill(smsCode);
+      console.log('✅ SMS-Code eingegeben');
+      
+      // Enter drücken
+      await smsInput.press('Enter');
+      console.log('✅ Enter gedrückt');
+
+      // SCHRITT 7: Warte auf E-Mail-TAN Screen
+      console.log('⏳ SCHRITT 7: Warte auf E-Mail-TAN Screen...');
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 8: Klicke auf "auf andere Art bestätigen" Link/Button
+      console.log('🔍 SCHRITT 8: Suche "auf andere Art bestätigen" Link...');
+      
+      const alternativeAuthSelectors = [
+        'a:has-text("auf andere Art bestätigen")',
+        'button:has-text("auf andere Art bestätigen")',
+        'a:has-text("andere Art")',
+        'button:has-text("andere Art")',
+      ];
+
+      let alternativeAuthLink = null;
+      for (const selector of alternativeAuthSelectors) {
+        try {
+          const elements = await page.locator(selector).all();
+          
+          for (const element of elements) {
+            const text = await element.textContent().catch(() => '');
+            const isVisible = await element.isVisible().catch(() => false);
+            
+            if (text && text.toLowerCase().includes('andere art') && isVisible) {
+              alternativeAuthLink = element;
+              console.log(`✅ Alternative Auth Link gefunden: "${text.trim()}"`);
+              break;
+            }
+          }
+          
+          if (alternativeAuthLink) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!alternativeAuthLink) {
+        throw new Error('Konnte "auf andere Art bestätigen" Link/Button nicht finden');
+      }
+
+      await alternativeAuthLink.click();
+      console.log('✅ "auf andere Art bestätigen" geklickt');
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 9: IBAN-Eingabefeld finden und IBAN eingeben
+      console.log('🏦 SCHRITT 9: Suche IBAN-Eingabefeld...');
+      await page.waitForLoadState('networkidle', { timeout: 10000 });
+      await page.waitForTimeout(1000);
+
+      const ibanSelectors = [
+        'input[name*="iban"]',
+        'input[id*="iban"]',
+        'input[placeholder*="IBAN"]',
+        'input[type="text"]',
+      ];
+
+      let ibanInput = null;
+      for (const selector of ibanSelectors) {
+        try {
+          const inputs = await page.locator(selector).all();
+          for (const input of inputs) {
+            const isVisible = await input.isVisible().catch(() => false);
+            if (isVisible) {
+              ibanInput = input;
+              console.log(`✅ IBAN-Eingabefeld gefunden mit: ${selector}`);
+              break;
+            }
+          }
+          if (ibanInput) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!ibanInput) {
+        throw new Error('Konnte IBAN-Eingabefeld nicht finden');
+      }
+
+      // IBAN eingeben
+      const iban = 'DE57370502990101508141';
+      console.log(`🏦 Gebe IBAN ein: ${iban}`);
+      
+      await page.waitForTimeout(500);
+      await ibanInput.fill(iban);
+      console.log('✅ IBAN eingegeben');
+
+      await page.waitForTimeout(1000);
+
+      // SCHRITT 10: "Weiter" Button nach IBAN-Eingabe klicken
+      console.log('➡️  SCHRITT 10: Suche "Weiter" Button nach IBAN-Eingabe...');
+      
+      const weiterButtonIbanSelectors = [
+        'button[type="submit"]:has-text("weiter")',
+        'button[type="submit"]:has-text("Weiter")',
+        'button:has-text("weiter")',
+        'button[type="submit"]',
+      ];
+
+      let weiterButtonIban = null;
+      for (const selector of weiterButtonIbanSelectors) {
+        try {
+          const buttons = await page.locator(selector).all();
+          
+          for (const btn of buttons) {
+            const isVisible = await btn.isVisible().catch(() => false);
+            if (isVisible) {
+              weiterButtonIban = btn;
+              console.log(`✅ "Weiter" Button gefunden`);
+              break;
+            }
+          }
+          
+          if (weiterButtonIban) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!weiterButtonIban) {
+        throw new Error('Konnte "Weiter" Button nach IBAN-Eingabe nicht finden');
+      }
+
+      console.log('✅ Klicke "Weiter" Button...');
+      
+      try {
+        await weiterButtonIban.click({ timeout: 3000 });
+        console.log('✅ "Weiter" Button geklickt (normal)');
+      } catch (e) {
+        await weiterButtonIban.click({ force: true });
+        console.log('✅ "Weiter" Button geklickt (force)');
+      }
+
+      await page.waitForTimeout(2000);
+
+      // SCHRITT 11: Warte auf nächsten Screen und klicke wieder auf "Weiter"
+      console.log('⏳ SCHRITT 11: Warte auf nächsten Screen...');
+      await page.waitForLoadState('networkidle', { timeout: 10000 });
+      await page.waitForTimeout(1000);
+
+      console.log('➡️  SCHRITT 11: Suche finalen "Weiter" Button...');
+      
+      const finalWeiterSelectors = [
+        'button[type="submit"]:has-text("weiter")',
+        'button:has-text("weiter")',
+        'button[type="submit"]',
+      ];
+
+      let finalWeiterButton = null;
+      for (const selector of finalWeiterSelectors) {
+        try {
+          const buttons = await page.locator(selector).all();
+          
+          for (const btn of buttons) {
+            const isVisible = await btn.isVisible().catch(() => false);
+            if (isVisible) {
+              finalWeiterButton = btn;
+              console.log(`✅ Finaler "Weiter" Button gefunden`);
+              break;
+            }
+          }
+          
+          if (finalWeiterButton) break;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!finalWeiterButton) {
+        throw new Error('Konnte finalen "Weiter" Button nicht finden');
+      }
+
+      console.log('✅ Klicke finalen "Weiter" Button...');
+      
+      try {
+        await finalWeiterButton.click({ timeout: 3000 });
+        console.log('✅ Finaler "Weiter" Button geklickt (normal)');
+      } catch (e) {
+        await finalWeiterButton.click({ force: true });
+        console.log('✅ Finaler "Weiter" Button geklickt (force)');
+      }
+
+      // SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite (Kundenbereich)
+      console.log('⏳ SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite...');
+      await page.waitForLoadState('networkidle', { timeout: 15000 });
+      await page.waitForTimeout(2000);
+
+      // Warte auf Kundenbereich URL
+      try {
+        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 10000 });
+        console.log('✅ Zum Kundenbereich weitergeleitet');
+      } catch (e) {
+        console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
+        await page.waitForTimeout(3000);
+      }
+
+      // SCHRITT 13: Prüfe c24session Cookie
+      console.log('🍪 SCHRITT 13: Prüfe c24session Cookie...');
+      
+      const finalUrl = page.url();
+      console.log(`📍 Finale URL: ${finalUrl}`);
+
+      // Alle Cookies holen
+      const allCookies = await page.context().cookies();
+      console.log(`📋 Alle Cookies (${allCookies.length}): ${allCookies.map(c => `${c.name} (Domain: ${c.domain})`).join(', ')}`);
+
+      // c24session Cookie(s) suchen
+      const c24sessionCookies = allCookies.filter(c => c.name === 'c24session');
+      
+      if (c24sessionCookies.length > 0) {
+        console.log(`✅ c24session Cookie(s) gefunden: ${c24sessionCookies.length}x`);
+        for (const cookie of c24sessionCookies) {
+          console.log(`   - ${cookie.value.substring(0, 20)}... (Domain: ${cookie.domain})`);
+        }
+      } else {
+        console.log('⚠️  c24session Cookie nicht gefunden');
+        
+        const isTestEnvironment = finalUrl.includes('check24-test.de');
+        if (!isTestEnvironment) {
+          throw new Error('Login nicht vollständig: c24session Cookie fehlt (PROD)');
+        } else {
+          console.log('⚠️  TEST Environment - Cookie-Check lenient');
+        }
+      }
+
+      // Login-Erfolg verifizieren
+      await expectLoginSuccess(page);
+
+      console.log(`✅ Passwort-Reset mit IBAN-Verifizierung via SMS vollständig erfolgreich: ${credentials.email}`);
+
+      // Logout
+      await logout(page);
+      
+      console.log('✅ Test komplett erfolgreich abgeschlossen');
+
+    } finally {
+      await context.close();
+    }
+  });
+
 });

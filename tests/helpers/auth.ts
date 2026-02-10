@@ -374,7 +374,6 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   // Warte auf Challenge-Seite
   await page.waitForTimeout(1000);
 
-  // Debug: Zeige aktuelle URL und Seitentitel
   const currentUrl = page.url();
   const pageTitle = await page.title();
   console.log(`📍 Aktuelle URL: ${currentUrl}`);
@@ -457,27 +456,10 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
     if (!selectedCorrectly) {
       console.log(`⚠️  WARNUNG: ${challengeMethod === 'email' ? 'E-Mail' : 'SMS'}-Option ist NICHT ausgewählt (checked=false)!`);
     }
-    
-    // Screenshot vor dem Button-Click
-    await page.screenshot({ 
-      path: `test-results/screenshots/before-weiter-click-${Date.now()}.png`,
-      fullPage: true 
-    });
-    console.log('📸 Screenshot erstellt vor Button-Click');
   }
 
   // SCHRITT 2: Klicke auf "Weiter" oder "Code senden" um E-Mail/SMS-Versand auszulösen
   console.log('➡️  Suche "Weiter" oder "Code senden"-Button um TAN-Code anzufordern...');
-  
-  // Debug: Liste ALLE Buttons auf dem Screen
-  const allButtonsDebug = await page.locator('button, a[role="button"]').all();
-  console.log(`🔍 Alle verfügbaren Buttons auf dem Screen (${allButtonsDebug.length}):`);
-  for (let i = 0; i < Math.min(allButtonsDebug.length, 15); i++) {
-    const btnText = await allButtonsDebug[i].textContent();
-    const btnType = await allButtonsDebug[i].getAttribute('type');
-    const isVisible = await allButtonsDebug[i].isVisible();
-    console.log(`   ${i + 1}. "${btnText?.trim()}" (type: ${btnType}, visible: ${isVisible})`);
-  }
   
   // PRIORISIERE "Code senden"-Buttons (die sind spezifischer für TAN-Versand)
   const submitButtonSelectors = [
@@ -557,20 +539,12 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
       console.log('⚠️  URL hat sich geändert!');
     }
     
-    // Screenshot NACH dem Click
-    await page.screenshot({ 
-      path: `test-results/screenshots/after-weiter-click-${Date.now()}.png`,
-      fullPage: true 
-    });
-    console.log('📸 Screenshot erstellt nach Button-Click');
-    
   } else {
     console.log('⚠️  Kein Submit-Button gefunden, versuche Enter...');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
   }
 
-  // Debug: Was ist nach dem Klick auf "Weiter" passiert?
   const urlAfterWeiter = page.url();
   const titleAfterWeiter = await page.title();
   console.log(`📍 Nach "Weiter"-Klick - URL: ${urlAfterWeiter}`);
@@ -823,18 +797,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   console.log(`📍 Aktuelle URL: ${postChallengeUrl}`);
   console.log(`📄 Seitentitel: ${postChallengeTitle}`);
   
-  // Debug: Zeige Seiteninhalt
   const bodyText = await page.locator('body').textContent();
-  console.log(`📄 Seiteninhalt (erste 300 Zeichen): ${bodyText?.substring(0, 300)}...`);
-  
-  // Debug: Liste alle Buttons auf
-  const allButtons = await page.locator('button, a[role="button"]').all();
-  console.log(`🔘 Gefundene Buttons (${allButtons.length}):`);
-  for (let i = 0; i < Math.min(allButtons.length, 10); i++) {
-    const btnText = await allButtons[i].textContent();
-    const btnType = await allButtons[i].getAttribute('type');
-    console.log(`   ${i + 1}. "${btnText?.trim()}" (type: ${btnType})`);
-  }
   
   // Prüfe auf Phone-Screen (case-insensitive)
   const phoneScreenPatterns = [
@@ -857,12 +820,6 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   
   if (phoneScreenFound) {
     console.log('➡️  Suche "später erinnern" oder ähnlichen Button...');
-    
-    // Screenshot vor dem Klick
-    await page.screenshot({ 
-      path: `test-results/screenshots/phone-screen-${Date.now()}.png`,
-      fullPage: true 
-    });
     
     // Erweiterte Button-Selektoren (case-insensitive)
     const laterButtonSelectors = [
@@ -920,13 +877,6 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
     if (!laterClicked) {
       console.log('⚠️  WARNUNG: "später erinnern" Button konnte nicht geklickt werden');
       console.log('   Seiten-URL:', postChallengeUrl);
-      console.log('   Verfügbare Buttons wurden oben gelistet');
-      
-      // Screenshot nach Fehler
-      await page.screenshot({ 
-        path: `test-results/screenshots/phone-screen-error-${Date.now()}.png`,
-        fullPage: true 
-      });
     } else {
       console.log('✅ Phone-Screen übersprungen');
       

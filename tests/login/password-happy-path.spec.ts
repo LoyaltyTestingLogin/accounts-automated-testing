@@ -34,12 +34,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
     // Erfolgreichen Login verifizieren
     await expectLoginSuccess(page);
 
-    // Screenshot nach erfolgreichem Login
-    await page.screenshot({ 
-      path: `test-results/screenshots/login-success-${credentials.account.id}-${Date.now()}.png`,
-      fullPage: true 
-    });
-
     console.log(`✅ Login vollständig erfolgreich für: ${email}`);
 
     // ===== COOKIE-BANNER WEGKLICKEN =====
@@ -418,12 +412,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
         await page.waitForTimeout(2000);
       } else {
         console.log('⚠️  Konnte "später erinnern" Button nicht finden/klicken');
-        
-        // Screenshot für Debug
-        await page.screenshot({
-          path: `test-results/screenshots/phone-collector-not-skipped-${Date.now()}.png`,
-          fullPage: true
-        });
       }
     } else {
       console.log('✅ Kein Phone-Collector Screen - weiter zum Check');
@@ -480,12 +468,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
     
     console.log('✅ Zweiter Login vollständig erfolgreich OHNE Challenge');
     
-    // Screenshot
-    await page.screenshot({
-      path: `test-results/screenshots/second-login-no-challenge-${Date.now()}.png`,
-      fullPage: true
-    });
-    
     // Cleanup: Logout
     await logout(page);
     
@@ -518,12 +500,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
 
       // Erfolgreichen Login verifizieren
       await expectLoginSuccess(page);
-
-      // Screenshot nach erfolgreichem Login
-      await page.screenshot({ 
-        path: `test-results/screenshots/login-success-combined-email-${Date.now()}.png`,
-        fullPage: true 
-      });
 
       console.log(`✅ Login vollständig erfolgreich für Combined Account (E-Mail-TAN): ${email}`);
 
@@ -571,16 +547,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
         
         // WICHTIG: Jetzt den richtigen "Weiter"-Button finden und klicken
         console.log('➡️  Suche "Weiter"-Button um SMS zu versenden...');
-        
-        // Debug: Liste alle Buttons
-        const allButtonsDebug = await page.locator('button, a[role="button"]').all();
-        console.log(`🔍 Alle verfügbaren Buttons (${allButtonsDebug.length}):`);
-        for (let i = 0; i < Math.min(allButtonsDebug.length, 15); i++) {
-          const btnText = await allButtonsDebug[i].textContent();
-          const btnType = await allButtonsDebug[i].getAttribute('type');
-          const isVisible = await allButtonsDebug[i].isVisible();
-          console.log(`   ${i + 1}. "${btnText?.trim()}" (type: ${btnType}, visible: ${isVisible})`);
-        }
         
         // Gleiche Button-Logik wie in handleLoginChallenge
         const submitButtonSelectors = [
@@ -653,7 +619,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
         console.log('📱 SMS wird jetzt an die Nummer gesendet: ' + credentials.account.phone);
         console.log('📧 Warte auf weitergeleitete SMS per Email von iPhone...');
         
-        // Debug: Zeige aktuellen Screen
         const afterUrl = page.url();
         const afterTitle = await page.title();
         console.log(`📍 URL nach SMS-Versand: ${afterUrl}`);
@@ -844,12 +809,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
         
         console.log('✅ Login vollständig erfolgreich mit SMS-TAN (via iPhone-Weiterleitung)');
         
-        // Screenshot vom erfolgreichen Login
-        await page.screenshot({ 
-          path: `test-results/screenshots/sms-login-success-${Date.now()}.png`,
-          fullPage: true 
-        });
-        
         // Logout
         const { logout } = await import('../helpers/auth.js');
         await logout(page);
@@ -884,7 +843,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
       console.log('⏳ Warte auf 2FA-Abfrage...');
       await page.waitForTimeout(3000);
 
-      // Debug: Zeige aktuellen Screen
       const currentUrl = page.url();
       const currentTitle = await page.title();
       console.log(`📍 URL nach Login: ${currentUrl}`);
@@ -1048,12 +1006,6 @@ test.describe('CHECK24 Login - Happy Path', () => {
         }
 
         console.log('✅ Login vollständig erfolgreich mit 2FA (via iPhone-Weiterleitung)');
-
-        // Screenshot vom erfolgreichen Login
-        await page.screenshot({
-          path: `test-results/screenshots/2fa-login-success-${Date.now()}.png`,
-          fullPage: true
-        });
 
         // Logout
         const { logout } = await import('../helpers/auth.js');
