@@ -24,8 +24,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
     const registrationContext = await browser.newContext();
     const registrationPage = await registrationContext.newPage();
 
-    let phoneNumber: string;
-    let email: string;
+    let phoneNumber: string = '';
+    let email: string = '';
 
     try {
       // Zur Registrierungs-Seite navigieren
@@ -196,15 +196,15 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
 
       // E-Mail-TAN-Code extrahieren
       console.log('🔍 Extrahiere E-Mail-TAN-Code...');
-      console.log(`   Betreff: ${emailTanEmail.subject}`);
+      console.log(`   Betreff: ${emailTanEmail!.subject}`);
       
       let emailTanCode: string | null = null;
-      const emailSubjectMatch = emailTanEmail.subject.match(/(\d{6})/);
+      const emailSubjectMatch = emailTanEmail!.subject.match(/(\d{6})/);
       if (emailSubjectMatch) {
         emailTanCode = emailSubjectMatch[1];
         console.log(`✅ E-Mail-TAN-Code extrahiert aus Betreff: ${emailTanCode}`);
       } else {
-        const bodyMatch = emailTanEmail.body.match(/(\d{6})/);
+        const bodyMatch = emailTanEmail!.body.match(/(\d{6})/);
         if (bodyMatch) {
           emailTanCode = bodyMatch[1];
           console.log(`✅ E-Mail-TAN-Code extrahiert aus Body: ${emailTanCode}`);
@@ -270,15 +270,15 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
 
       // SMS-TAN-Code extrahieren
       console.log('🔍 Extrahiere SMS-TAN-Code aus weitergeleiteter SMS...');
-      console.log(`   Betreff: ${smsTanEmail.subject}`);
+      console.log(`   Betreff: ${smsTanEmail!.subject}`);
       
       let smsTanCode: string | null = null;
-      const smsSubjectMatch = smsTanEmail.subject.match(/(\d{6})/);
+      const smsSubjectMatch = smsTanEmail!.subject.match(/(\d{6})/);
       if (smsSubjectMatch) {
         smsTanCode = smsSubjectMatch[1];
         console.log(`✅ SMS-TAN-Code extrahiert aus Betreff: ${smsTanCode}`);
       } else {
-        const smsBodyMatch = smsTanEmail.body.match(/(\d{6})/);
+        const smsBodyMatch = smsTanEmail!.body.match(/(\d{6})/);
         if (smsBodyMatch) {
           smsTanCode = smsBodyMatch[1];
           console.log(`✅ SMS-TAN-Code extrahiert aus Body: ${smsTanCode}`);
@@ -928,10 +928,10 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
 
       // SMS-TAN extrahieren
       console.log('🔍 Extrahiere SMS-TAN-Code aus weitergeleiteter SMS...');
-      console.log(`   Betreff: ${smsTanEmail.subject}`);
+      console.log(`   Betreff: ${smsTanEmail!.subject}`);
       
       let smsTanCode: string | null = null;
-      const smsMatch = smsTanEmail.body.match(/(\d{6})/);
+      const smsMatch = smsTanEmail!.body.match(/(\d{6})/);
       if (smsMatch) {
         smsTanCode = smsMatch[1];
         console.log(`✅ SMS-TAN-Code extrahiert aus Body: ${smsTanCode}`);
@@ -1261,7 +1261,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         console.log('📧 Warte auf E-Mail-TAN...');
         const emailClient3 = getEmailClient();
         const emailTan3 = await emailClient3.waitForEmail({ subject: 'CHECK24' }, 120000, 3000);
-        const emailTanCode3 = emailTan3.subject.match(/(\d{6})/)?.[1];
+        const emailTanCode3 = emailTan3!.subject.match(/(\d{6})/)?.[1];
         if (!emailTanCode3) throw new Error('E-Mail-TAN konnte nicht extrahiert werden');
         console.log(`✅ E-Mail-TAN: ${emailTanCode3}`);
         
@@ -1391,450 +1391,19 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       }
       
       console.log('\n✅ TEIL 3 ABGESCHLOSSEN (E-Mail TAN)\n');
-      
-    // ================================================================================
-    // TEIL 4: OTP Login mit Phone TAN + PLZ/Birthday Challenge (DEBUGGING)
-    // ================================================================================
-    console.log('\n🔐 TEIL 4: Teste OTP Login mit Phone TAN + PLZ/Birthday Challenge...\n');
     
-    const resetContext4 = await browser.newContext();
-    const resetPage4 = await resetContext4.newPage();
-      
-      try {
-        await resetPage4.goto(getLoginUrl());
-        await resetPage4.waitForLoadState('networkidle');
-        
-        console.log(`📱 Gebe Phone-Nummer ein: ${phoneNumber}`);
-        const phoneInput4 = resetPage4.locator('#cl_login');
-        await phoneInput4.fill(phoneNumber);
-        console.log('✅ Phone-Nummer eingegeben');
-        
-        const weiterBtn4First = resetPage4.getByRole('button', { name: 'Weiter' });
-        await weiterBtn4First.click();
-        console.log('✅ "Weiter" geklickt');
-        await resetPage4.waitForTimeout(2000);
-        
-        console.log('🔍 Suche "Mit Einmalcode anmelden" Button...');
-        console.log(`📍 Aktuelle URL: ${resetPage4.url()}`);
-        
-        // Debug: Zeige Body-Text
-        const bodyText4 = await resetPage4.locator('body').innerText();
-        console.log(`📄 Body-Text (erste 1000 Zeichen):\n${bodyText4.substring(0, 1000)}`);
-        
-        // Debug: Liste alle sichtbaren Links und Buttons
-        console.log('🔍 Liste alle sichtbaren Buttons...');
-        const allButtons4 = await resetPage4.locator('button').all();
-        for (let i = 0; i < allButtons4.length; i++) {
-          const btn = allButtons4[i];
-          const isVisible = await btn.isVisible().catch(() => false);
-          if (isVisible) {
-            const text = await btn.textContent().catch(() => '');
-            const type = await btn.getAttribute('type').catch(() => '');
-            console.log(`   Button ${i+1}: "${text?.trim()}" (type: ${type})`);
-          }
-        }
-        
-        console.log('🔍 Liste alle sichtbaren Links...');
-        const allLinks4 = await resetPage4.locator('a').all();
-        let visibleLinkCount = 0;
-        for (let i = 0; i < allLinks4.length; i++) {
-          const link = allLinks4[i];
-          const isVisible = await link.isVisible().catch(() => false);
-          if (isVisible) {
-            const text = await link.textContent().catch(() => '');
-            const href = await link.getAttribute('href').catch(() => '');
-            if (text && text.trim().length > 0) {
-              console.log(`   Link ${++visibleLinkCount}: "${text.trim()}" (href: ${href})`);
-            }
-          }
-        }
-        
-        throw new Error('DEBUG STOP - Bitte prüfe die Ausgabe');
-        
-        console.log('🔍 Wähle SMS/Phone TAN...');
-        const smsLabelSelectors4 = ['label:has-text("SMS")', 'label:has-text("Telefon")', 'label[for*="sms"]'];
-        
-        let smsLabel4Found = false;
-        for (const selector of smsLabelSelectors4) {
-          try {
-            const labels = await resetPage4.locator(selector).all();
-            for (const label of labels) {
-              const isVisible = await label.isVisible().catch(() => false);
-              if (isVisible) {
-                await label.click();
-                console.log(`✅ SMS-Option ausgewählt mit: ${selector}`);
-                smsLabel4Found = true;
-                break;
-              }
-            }
-            if (smsLabel4Found) break;
-          } catch (e) {
-            continue;
-          }
-        }
-        
-        await resetPage4.waitForTimeout(1000);
-        
-        const submitBtnSelectors4 = ['button:has-text("Code senden")', 'button:has-text("Weiter")', 'button[type="submit"]'];
-        let submitBtn4 = null;
-        for (const selector of submitBtnSelectors4) {
-          const buttons = await resetPage4.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              submitBtn4 = btn;
-              console.log(`✅ Submit-Button gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (submitBtn4) break;
-        }
-        
-        if (!submitBtn4) throw new Error('Konnte "Code senden" Button nicht finden');
-        
-        await submitBtn4.click();
-        console.log('✅ "Code senden" geklickt');
-        await resetPage4.waitForTimeout(2000);
-        
-        console.log('📱 Warte auf SMS-TAN...');
-        const emailClient4 = getEmailClient();
-        const smsTan4 = await emailClient4.waitForEmail({ from: 'ulitesting@icloud.com' }, 120000, 3000);
-        const smsTanCode4 = smsTan4.body.match(/(\d{6})/)?.[1];
-        if (!smsTanCode4) throw new Error('SMS-TAN konnte nicht extrahiert werden');
-        console.log(`✅ SMS-TAN: ${smsTanCode4}`);
-        
-        const tanInputSelectors4 = ['input[type="text"]', 'input[type="tel"]', 'input[id*="tan"]'];
-        let tanInput4 = null;
-        for (const selector of tanInputSelectors4) {
-          const inputs = await resetPage4.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              tanInput4 = input;
-              console.log(`✅ TAN-Eingabefeld gefunden mit ${selector}`);
-              break;
-            }
-          }
-          if (tanInput4) break;
-        }
-        
-        if (!tanInput4) throw new Error('Konnte TAN-Eingabefeld nicht finden');
-        
-        await resetPage4.waitForTimeout(500);
-        await tanInput4.fill(smsTanCode4);
-        await tanInput4.press('Enter');
-        console.log('✅ SMS-TAN eingegeben');
-        await resetPage4.waitForTimeout(2000);
-        
-        console.log('🎂 Gebe Geburtsdatum ein...');
-        const birthdaySelectors4 = ['input[name*="birthday"]', 'input[name*="birthdate"]'];
-        let birthdayInput4 = null;
-        for (const selector of birthdaySelectors4) {
-          const inputs = await resetPage4.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              birthdayInput4 = input;
-              console.log(`✅ Geburtsdatum-Feld gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (birthdayInput4) break;
-        }
-        
-        if (!birthdayInput4) throw new Error('Konnte Geburtsdatum-Feld nicht finden');
-        
-        await birthdayInput4.click({ clickCount: 3 });
-        await resetPage4.waitForTimeout(300);
-        await birthdayInput4.pressSequentially('26042000', { delay: 150 });
-        await resetPage4.waitForTimeout(1000);
-        console.log('✅ Geburtsdatum eingegeben');
-        
-        const weiterSelectors4 = ['button:has-text("Weiter")', 'button[type="submit"]'];
-        let weiterBtn4a = null;
-        for (const selector of weiterSelectors4) {
-          const buttons = await resetPage4.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterBtn4a = btn;
-              console.log(`✅ Erster "Weiter" gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterBtn4a) break;
-        }
-        
-        if (!weiterBtn4a) throw new Error('Konnte ersten "Weiter" Button nicht finden');
-        
-        await weiterBtn4a.click();
-        console.log('✅ Erster "Weiter" geklickt');
-        await resetPage4.waitForTimeout(2000);
-        
-        let weiterBtn4b = null;
-        for (const selector of weiterSelectors4) {
-          const buttons = await resetPage4.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterBtn4b = btn;
-              console.log(`✅ Zweiter "Weiter" gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterBtn4b) break;
-        }
-        
-        if (!weiterBtn4b) {
-          console.log('⚠️  Zweiter "Weiter" Button nicht gefunden - möglicherweise direkte Weiterleitung');
-        } else {
-          await weiterBtn4b.click();
-          console.log('✅ Zweiter "Weiter" geklickt');
-        }
-        
-        await resetPage4.waitForTimeout(3000);
-        
-        const cookies4 = await resetPage4.context().cookies();
-        const c24Cookie4 = cookies4.find(c => c.name === 'c24session');
-        if (c24Cookie4) {
-          console.log('✅ c24session Cookie gefunden (OTP Phone TAN)!');
-        } else {
-          throw new Error('❌ c24session Cookie NICHT gefunden (OTP Phone TAN)!');
-        }
-      } finally {
-        await resetContext4.close();
-      }
-      
-      console.log('\n✅ TEIL 4 ABGESCHLOSSEN (OTP Phone TAN)\n');
-      
-  } finally {
-    await browser.close();
-  }
-});
-
-});
-/*
-      const resetContext5 = await browser.newContext();
-      const resetPage5 = await resetContext5.newPage();
-      
-      try {
-        await resetPage5.goto(getLoginUrl());
-        await resetPage5.waitForLoadState('networkidle');
-        
-        console.log(`📱 Gebe Phone-Nummer ein: ${phoneNumber}`);
-        const phoneInput5 = resetPage5.locator('#cl_login');
-        await phoneInput5.fill(phoneNumber);
-        console.log('✅ Phone-Nummer eingegeben');
-        
-        const weiterBtn5First = resetPage5.getByRole('button', { name: 'Weiter' });
-        await weiterBtn5First.click();
-        console.log('✅ "Weiter" geklickt');
-        await resetPage5.waitForTimeout(2000);
-        
-        console.log('🔍 Klicke auf "Mit Einmalcode anmelden"...');
-        const otpSelectors5 = [
-          'a:has-text("Mit Einmalcode anmelden")',
-          'button:has-text("Mit Einmalcode anmelden")',
-          'a:has-text("mit Einmalcode anmelden")',
-          'button:has-text("mit Einmalcode anmelden")',
-          'a:has-text("Einmalcode")',
-          'button:has-text("Einmalcode")',
-        ];
-        
-        let otpLink5 = null;
-        for (const selector of otpSelectors5) {
-          try {
-            const elements = await resetPage5.locator(selector).all();
-            for (const element of elements) {
-              const isVisible = await element.isVisible().catch(() => false);
-              if (isVisible) {
-                otpLink5 = element;
-                console.log(`✅ "Mit Einmalcode anmelden" gefunden mit: ${selector}`);
-                break;
-              }
-            }
-            if (otpLink5) break;
-          } catch (e) {
-            continue;
-          }
-        }
-        
-        if (!otpLink5) {
-          throw new Error('Konnte "Mit Einmalcode anmelden" nicht finden');
-        }
-        
-        await otpLink5.click();
-        await resetPage5.waitForTimeout(2000);
-        
-        console.log('🔍 Wähle E-Mail TAN...');
-        const emailLabelSelectors5 = ['label:has-text("E-Mail")', 'label[for*="email"]'];
-        
-        let emailLabel5Found = false;
-        for (const selector of emailLabelSelectors5) {
-          try {
-            const labels = await resetPage5.locator(selector).all();
-            for (const label of labels) {
-              const isVisible = await label.isVisible().catch(() => false);
-              if (isVisible) {
-                await label.click();
-                console.log(`✅ E-Mail-Option ausgewählt mit: ${selector}`);
-                emailLabel5Found = true;
-                break;
-              }
-            }
-            if (emailLabel5Found) break;
-          } catch (e) {
-            continue;
-          }
-        }
-        
-        await resetPage5.waitForTimeout(1000);
-        
-        const submitBtnSelectors5 = ['button:has-text("Code senden")', 'button:has-text("Weiter")', 'button[type="submit"]'];
-        let submitBtn5 = null;
-        for (const selector of submitBtnSelectors5) {
-          const buttons = await resetPage5.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              submitBtn5 = btn;
-              console.log(`✅ Submit-Button gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (submitBtn5) break;
-        }
-        
-        if (!submitBtn5) throw new Error('Konnte "Code senden" Button nicht finden');
-        
-        await submitBtn5.click();
-        console.log('✅ "Code senden" geklickt');
-        await resetPage5.waitForTimeout(2000);
-        
-        console.log('📧 Warte auf E-Mail-TAN...');
-        const emailClient5 = getEmailClient();
-        const emailTan5 = await emailClient5.waitForEmail({ subject: 'CHECK24' }, 120000, 3000);
-        const emailTanCode5 = emailTan5.subject.match(/(\d{6})/)?.[1];
-        if (!emailTanCode5) throw new Error('E-Mail-TAN konnte nicht extrahiert werden');
-        console.log(`✅ E-Mail-TAN: ${emailTanCode5}`);
-        
-        const tanInputSelectors5 = ['input[type="text"]', 'input[type="tel"]', 'input[id*="tan"]'];
-        let tanInput5 = null;
-        for (const selector of tanInputSelectors5) {
-          const inputs = await resetPage5.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              tanInput5 = input;
-              console.log(`✅ TAN-Eingabefeld gefunden mit ${selector}`);
-              break;
-            }
-          }
-          if (tanInput5) break;
-        }
-        
-        if (!tanInput5) throw new Error('Konnte TAN-Eingabefeld nicht finden');
-        
-        await resetPage5.waitForTimeout(500);
-        await tanInput5.fill(emailTanCode5);
-        await tanInput5.press('Enter');
-        console.log('✅ E-Mail-TAN eingegeben');
-        await resetPage5.waitForTimeout(2000);
-        
-        console.log('🎂 Gebe Geburtsdatum ein...');
-        const birthdaySelectors5 = ['input[name*="birthday"]', 'input[name*="birthdate"]'];
-        let birthdayInput5 = null;
-        for (const selector of birthdaySelectors5) {
-          const inputs = await resetPage5.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              birthdayInput5 = input;
-              console.log(`✅ Geburtsdatum-Feld gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (birthdayInput5) break;
-        }
-        
-        if (!birthdayInput5) throw new Error('Konnte Geburtsdatum-Feld nicht finden');
-        
-        await birthdayInput5.click({ clickCount: 3 });
-        await resetPage5.waitForTimeout(300);
-        await birthdayInput5.pressSequentially('26042000', { delay: 150 });
-        await resetPage5.waitForTimeout(1000);
-        console.log('✅ Geburtsdatum eingegeben');
-        
-        const weiterSelectors5 = ['button:has-text("Weiter")', 'button[type="submit"]'];
-        let weiterBtn5a = null;
-        for (const selector of weiterSelectors5) {
-          const buttons = await resetPage5.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterBtn5a = btn;
-              console.log(`✅ Erster "Weiter" gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterBtn5a) break;
-        }
-        
-        if (!weiterBtn5a) throw new Error('Konnte ersten "Weiter" Button nicht finden');
-        
-        await weiterBtn5a.click();
-        console.log('✅ Erster "Weiter" geklickt');
-        await resetPage5.waitForTimeout(2000);
-        
-        let weiterBtn5b = null;
-        for (const selector of weiterSelectors5) {
-          const buttons = await resetPage5.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterBtn5b = btn;
-              console.log(`✅ Zweiter "Weiter" gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterBtn5b) break;
-        }
-        
-        if (!weiterBtn5b) {
-          console.log('⚠️  Zweiter "Weiter" Button nicht gefunden - möglicherweise direkte Weiterleitung');
-        } else {
-          await weiterBtn5b.click();
-          console.log('✅ Zweiter "Weiter" geklickt');
-        }
-        
-        await resetPage5.waitForTimeout(3000);
-        
-        const cookies5 = await resetPage5.context().cookies();
-        const c24Cookie5 = cookies5.find(c => c.name === 'c24session');
-        if (c24Cookie5) {
-          console.log('✅ c24session Cookie gefunden (OTP E-Mail TAN)!');
-        } else {
-          throw new Error('❌ c24session Cookie NICHT gefunden (OTP E-Mail TAN)!');
-        }
-        
-          console.log('\n✅ TEIL 5 ABGESCHLOSSEN (OTP E-Mail TAN)\n');
-        
-      } finally {
-        await resetContext5.close();
-      }
-        
     // ================================================================================
     // SCHRITT 8: Lösche das Konto wieder
     // ================================================================================
     console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto...');
-        
-        // Öffne nochmal den Kundenbereich mit einem neuen Kontext, da resetContext3 bereits geschlossen wurde
-        const deleteContext = await browser.newContext();
-        const deletePage = await deleteContext.newPage();
-        
-        try {
-          // Navigiere zum Kundenbereich und logge dich mit Phone ein
-          await deletePage.goto(getLoginUrl());
+    
+    // Öffne nochmal den Kundenbereich mit einem neuen Kontext, da resetContext3 bereits geschlossen wurde
+    const deleteContext = await browser.newContext();
+    const deletePage = await deleteContext.newPage();
+    
+    try {
+      // Navigiere zum Kundenbereich und logge dich mit Phone ein
+      await deletePage.goto(getLoginUrl());
           await deletePage.waitForLoadState('networkidle');
           
           const phoneInputDelete = deletePage.locator('#cl_login');
