@@ -168,25 +168,9 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
         await page.waitForTimeout(1000);
       }
 
-      // Prüfe auf Phone Collector Screen und überspringe ihn falls vorhanden
-      console.log('🔍 Prüfe auf Phone Collector Screen...');
-      try {
-        const phoneCollectorButton = page.getByText('später erinnern');
-        const isVisible = await phoneCollectorButton.isVisible({ timeout: 3000 }).catch(() => false);
-        if (isVisible) {
-          console.log('📱 Phone Collector erkannt - klicke "später erinnern"');
-          await phoneCollectorButton.click();
-          await page.waitForTimeout(2000);
-          console.log('✅ Phone Collector übersprungen');
-        } else {
-          console.log('   ℹ️  Kein Phone Collector gefunden');
-        }
-      } catch (e) {
-        console.log('   ℹ️  Kein Phone Collector gefunden');
-      }
-
       // Warte zusätzlich, damit alle Cookies gesetzt werden
-      await page.waitForTimeout(2000);
+      console.log('⏳ Warte auf Cookie-Setzung...');
+      await page.waitForTimeout(3000);
 
       // SCHRITT 6: c24session Cookie verifizieren
       console.log('🔍 SCHRITT 6: Prüfe c24session Cookie...');
