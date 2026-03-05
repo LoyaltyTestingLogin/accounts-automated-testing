@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-hooks';
 import { loginWithPassword, expectLoginSuccess, logout, handleLoginChallenge } from '../helpers/auth';
 import { getAccountCredentials } from '../fixtures/accounts';
 import { sendEmailTimeoutWarning } from '../helpers/slack';

@@ -44,3 +44,29 @@ export async function sendEmailTimeoutWarning(
   
   await sendSlackWarning(message);
 }
+
+/**
+ * Sendet eine Benachrichtigung über einen Test-Fehler an Slack
+ */
+export async function sendTestFailureNotification(
+  testTitle: string,
+  errorMessage: string,
+  testFile: string,
+  retryNumber: number
+): Promise<void> {
+  // Nur bei PROD Environment Benachrichtigungen senden
+  const environment = process.env.TEST_ENVIRONMENT || 'prod';
+  if (environment !== 'prod') {
+    console.log(`ℹ️  Test-Fehler auf ${environment.toUpperCase()} - keine Slack-Benachrichtigung`);
+    return;
+  }
+
+  const message = `❌ *TEST FEHLGESCHLAGEN* (nach ${retryNumber} Retry${retryNumber === 1 ? '' : 's'})\n\n` +
+    `*Test:* ${testTitle}\n` +
+    `*Datei:* ${testFile}\n` +
+    `*Environment:* ${environment.toUpperCase()}\n` +
+    `*Fehler:* ${errorMessage}\n` +
+    `*Zeit:* ${new Date().toISOString()}`;
+  
+  await sendSlackWarning(message);
+}

@@ -1,4 +1,5 @@
-import { test, expect, chromium } from '@playwright/test';
+import { test, expect } from '../fixtures/test-hooks';
+import { chromium } from '@playwright/test';
 import { TEST_ACCOUNTS } from '../fixtures/accounts';
 import { getLoginUrl, getKundenbereichUrl } from '../helpers/environment';
 import * as path from 'path';

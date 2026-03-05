@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test-hooks';
 import { expectLoginSuccess, logout } from '../helpers/auth';
 import { getAccountCredentials } from '../fixtures/accounts';
 import { getEmailClient } from '../helpers/email';
