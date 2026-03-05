@@ -262,6 +262,10 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
         await page.waitForTimeout(1000);
       }
 
+      // Warte zusätzlich, damit alle Cookies gesetzt werden
+      console.log('⏳ Warte auf Cookie-Setzung...');
+      await page.waitForTimeout(3000);
+
       // SCHRITT 10: c24session Cookie verifizieren
       console.log('🔍 SCHRITT 10: Prüfe c24session Cookie...');
       await expectLoginSuccess(page);
