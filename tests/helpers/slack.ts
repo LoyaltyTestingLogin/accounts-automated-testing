@@ -54,12 +54,7 @@ export async function sendTestFailureNotification(
   testFile: string,
   retryNumber: number
 ): Promise<void> {
-  // Nur bei PROD Environment Benachrichtigungen senden
   const environment = process.env.TEST_ENVIRONMENT || 'prod';
-  if (environment !== 'prod') {
-    console.log(`ℹ️  Test-Fehler auf ${environment.toUpperCase()} - keine Slack-Benachrichtigung`);
-    return;
-  }
 
   const message = `❌ *TEST FEHLGESCHLAGEN* (nach ${retryNumber} Retry${retryNumber === 1 ? '' : 's'})\n\n` +
     `*Test:* ${testTitle}\n` +

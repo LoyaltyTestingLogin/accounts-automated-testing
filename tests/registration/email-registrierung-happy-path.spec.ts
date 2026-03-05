@@ -176,32 +176,31 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       console.log('🔍 SCHRITT 6: Prüfe c24session Cookie...');
       await expectLoginSuccess(page);
 
-      // SCHRITT 7: Starte asynchrone Prüfung auf Willkommensmail
-      console.log('📧 SCHRITT 7: Starte asynchrone Prüfung auf Willkommensmail...');
+      // SCHRITT 7: Warte auf Willkommensmail
+      console.log('📧 SCHRITT 7: Warte auf Willkommensmail...');
       
-      const welcomeEmailPromise = emailClient.waitForEmail(
-        {
-          subject: 'Herzlich willkommen bei CHECK24!',
-        },
-        30000,
-        2000
-      ).then((welcomeEmail) => {
-        console.log(`✅ Willkommensmail erhalten: "${welcomeEmail.subject}"`);
-        return welcomeEmail;
-      }).catch(async () => {
-        console.warn('⚠️  Willkommensmail nicht innerhalb von 30 Sekunden erhalten');
+      try {
+        const welcomeEmail = await emailClient.waitForEmail(
+          {
+            subject: 'Herzlich willkommen bei CHECK24!',
+          },
+          30000,
+          2000
+        );
+        console.log(`✅ Willkommensmail erhalten: "${welcomeEmail!.subject}"`);
+      } catch (error) {
         await sendEmailTimeoutWarning(
           'E-Mail-Registrierung - Willkommensmail',
           'subject: Herzlich willkommen bei CHECK24!',
           30
         );
-        return null;
-      });
+        throw error;
+      }
 
       console.log(`✅ E-Mail-Registrierung vollständig erfolgreich für: ${email}`);
 
-      // SCHRITT 8: Konto wieder löschen (parallel zur Willkommensmail-Prüfung)
-      console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto (parallel zur Willkommensmail-Prüfung)...');
+      // SCHRITT 8: Konto wieder löschen
+      console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto...');
       
       // Cookie-Banner schließen (falls vorhanden)
       console.log('   Prüfe auf Cookie-Banner...');
@@ -251,9 +250,6 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       await page.waitForTimeout(1000);
 
       console.log('✅ Konto erfolgreich gelöscht');
-
-      // Warte auf Abschluss der Willkommensmail-Prüfung
-      await welcomeEmailPromise;
     } finally {
       await context.close();
     }
