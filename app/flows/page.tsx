@@ -341,6 +341,174 @@ const flows: Flow[] = [
         screenshot: '/flow-screenshots/account-replace-email/17-kundenbereich-after-replace.png'
       }
     ]
+  },
+  {
+    id: 'login-password',
+    name: 'Passwort-Login mit Challenge',
+    description: 'Standard-Login mit E-Mail und Passwort, inklusive Login-Challenge (TAN-Verifizierung bei unbekanntem Gerät).',
+    category: 'login',
+    steps: [
+      {
+        id: '01',
+        title: 'Login-Screen (leer)',
+        description: 'Der Benutzer startet auf dem Login-Screen.',
+        screenshot: '/flow-screenshots/login-password/01-login-screen-empty.png'
+      },
+      {
+        id: '02',
+        title: 'E-Mail eingegeben',
+        description: 'E-Mail-Adresse wurde eingegeben, Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/login-password/02-email-entered.png'
+      },
+      {
+        id: '03',
+        title: 'Passwort-Screen (leer)',
+        description: 'Passwort-Eingabe-Screen erscheint.',
+        screenshot: '/flow-screenshots/login-password/03-password-screen-empty.png'
+      },
+      {
+        id: '04',
+        title: 'Passwort eingegeben',
+        description: 'Passwort wurde eingegeben, Benutzer drückt Enter zum Anmelden.',
+        screenshot: '/flow-screenshots/login-password/04-password-entered.png'
+      },
+      {
+        id: '05',
+        title: 'Login-Challenge (leer)',
+        description: 'Sicherheitsprüfung bei unbekanntem Gerät - System fragt nach TAN-Code per E-Mail.',
+        screenshot: '/flow-screenshots/login-password/05-login-challenge-screen-empty.png'
+      },
+      {
+        id: '06',
+        title: 'Challenge bestanden',
+        description: 'TAN-Code wurde eingegeben und verifiziert. System leitet zum Kundenbereich weiter.',
+        screenshot: '/flow-screenshots/login-password/06-challenge-completed.png'
+      },
+      {
+        id: '07',
+        title: 'Kundenbereich nach Login',
+        description: 'Login erfolgreich! Benutzer ist im Kundenbereich eingeloggt.',
+        screenshot: '/flow-screenshots/login-password/07-kundenbereich-after-login.png'
+      }
+    ]
+  },
+  {
+    id: 'login-otp',
+    name: 'OTP-Login (Einmalcode)',
+    description: 'Login mit Einmalcode ohne Passwort - TAN-Code wird per E-Mail versendet.',
+    category: 'login',
+    steps: [
+      {
+        id: '01',
+        title: 'Login-Screen (leer)',
+        description: 'Der Benutzer startet auf dem Login-Screen.',
+        screenshot: '/flow-screenshots/login-otp/01-login-screen-empty.png'
+      },
+      {
+        id: '02',
+        title: 'E-Mail eingegeben',
+        description: 'E-Mail-Adresse wurde eingegeben, Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/login-otp/02-email-entered.png'
+      },
+      {
+        id: '03',
+        title: 'Passwort-Screen mit OTP-Option',
+        description: 'Passwort-Screen erscheint mit Option "mit Einmalcode anmelden".',
+        screenshot: '/flow-screenshots/login-otp/03-password-screen-with-otp-option.png'
+      },
+      {
+        id: '04',
+        title: 'OTP-Selection-Screen',
+        description: 'Nach Klick auf "mit Einmalcode anmelden" erscheint die Auswahl für den Versand.',
+        screenshot: '/flow-screenshots/login-otp/04-otp-selection-screen.png'
+      },
+      {
+        id: '05',
+        title: 'OTP-Code-Eingabe (leer)',
+        description: 'Nach Klick auf "Code senden" wird der Einmalcode per E-Mail versendet.',
+        screenshot: '/flow-screenshots/login-otp/05-otp-code-input-screen-empty.png'
+      },
+      {
+        id: '06',
+        title: 'OTP-Code eingegeben',
+        description: 'Einmalcode wurde eingegeben. System leitet automatisch weiter.',
+        screenshot: '/flow-screenshots/login-otp/06-otp-code-entered.png'
+      },
+      {
+        id: '07',
+        title: 'Kundenbereich nach OTP-Login',
+        description: 'OTP-Login erfolgreich! Benutzer ist im Kundenbereich eingeloggt.',
+        screenshot: '/flow-screenshots/login-otp/07-kundenbereich-after-otp-login.png'
+      }
+    ]
+  },
+  {
+    id: 'login-password-reset',
+    name: 'Passwort zurücksetzen',
+    description: 'Kompletter Flow zum Zurücksetzen eines vergessenen Passworts mit TAN-Verifizierung.',
+    category: 'login',
+    steps: [
+      {
+        id: '01',
+        title: 'Login-Screen (leer)',
+        description: 'Der Benutzer startet auf dem Login-Screen.',
+        screenshot: '/flow-screenshots/login-password-reset/01-login-screen-empty.png'
+      },
+      {
+        id: '02',
+        title: 'E-Mail eingegeben',
+        description: 'E-Mail-Adresse wurde eingegeben, Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/login-password-reset/02-email-entered.png'
+      },
+      {
+        id: '03',
+        title: 'Passwort-Screen mit "Passwort vergessen?"',
+        description: 'Passwort-Screen erscheint mit Link "Passwort vergessen?".',
+        screenshot: '/flow-screenshots/login-password-reset/03-password-screen-with-forgot-link.png'
+      },
+      {
+        id: '04',
+        title: 'Password-Reset-Screen',
+        description: 'Nach Klick auf "Passwort vergessen?" erscheint der Reset-Screen.',
+        screenshot: '/flow-screenshots/login-password-reset/04-password-reset-screen.png'
+      },
+      {
+        id: '05',
+        title: 'Reset-TAN-Eingabe (leer)',
+        description: 'Nach Klick auf "Code senden" wird ein Reset-TAN per E-Mail versendet.',
+        screenshot: '/flow-screenshots/login-password-reset/05-reset-tan-input-screen-empty.png'
+      },
+      {
+        id: '06',
+        title: 'Reset-TAN eingegeben',
+        description: 'Reset-TAN wurde eingegeben und verifiziert.',
+        screenshot: '/flow-screenshots/login-password-reset/06-reset-tan-entered.png'
+      },
+      {
+        id: '07',
+        title: 'Erfolgsmeldung mit "Passwort ändern"',
+        description: 'TAN-Verifizierung erfolgreich. Link zum Ändern des Passworts wird angezeigt.',
+        screenshot: '/flow-screenshots/login-password-reset/07-success-screen-with-change-link.png'
+      },
+      {
+        id: '08',
+        title: 'Neues Passwort Formular (leer)',
+        description: 'Formular zum Eingeben des neuen Passworts (zweimal).',
+        screenshot: '/flow-screenshots/login-password-reset/08-new-password-form-empty.png'
+      },
+      {
+        id: '09',
+        title: 'Neues Passwort eingegeben',
+        description: 'Neues Passwort wurde in beide Felder eingegeben.',
+        screenshot: '/flow-screenshots/login-password-reset/09-new-password-form-filled.png'
+      },
+      {
+        id: '10',
+        title: 'Passwort erfolgreich geändert',
+        description: 'Passwort wurde erfolgreich zurückgesetzt und geändert.',
+        screenshot: '/flow-screenshots/login-password-reset/10-password-changed-success.png'
+      }
+    ]
   }
 ];
 
