@@ -40,6 +40,13 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     testCount: 2,
   },
   {
+    id: 'login-plz-birthday-challenge',
+    name: 'Login - PLZ/Birthday Challenge',
+    path: 'tests/login/plz-birthday-challenge.spec.ts',
+    description: 'Vollständige Tests für Geburtsdatum- und PLZ-Challenge bei Passwort-Reset und OTP-Login\n\n• Test 1: Geburtsdatum-Challenge (Account erstellen, Geburtsdatum hinterlegen, 2x Passwort-Reset mit Birthday-Challenge, 2x OTP-Login mit Birthday-Challenge, Account löschen)\n\n• Test 2: PLZ-Challenge (Account erstellen, PLZ hinterlegen, 2x Passwort-Reset mit PLZ-Challenge, 2x OTP-Login mit PLZ-Challenge, Account löschen)',
+    testCount: 2,
+  },
+  {
     id: 'registration-email',
     name: 'Registrierung - E-Mail Registrierung',
     path: 'tests/registration/email-registrierung-happy-path.spec.ts',
@@ -52,6 +59,13 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     path: 'tests/registration/phone-registrierung-happy-path.spec.ts',
     description: 'Vollständiger Phone-Registrierungs-Flow\n\n• Phone eingeben\n\n• Passwort wählen (optional)\n\n• TAN-Verifizierung per SMS\n\n• Registrierung abschließen\n\n• Account wird über "Anmelden & Sicherheit" gelöscht',
     testCount: 1,
+  },
+  {
+    id: 'registration-account-replace',
+    name: 'Registrierung - Account Replace',
+    path: 'tests/registration/account-replace.spec.ts',
+    description: 'Account Replace Flow - Ersetzen eines bestehenden Accounts\n\n• Test 1: Account Replace mit E-Mail-Adresse (Erstelle Account → Öffne neuen Browser → Klicke "dieser E-Mail-Adresse" → "trotzdem neues Konto erstellen" → Account ersetzen)\n\n• Test 2: Account Replace mit Mobiltelefonnummer (Erstelle Account mit Phone → Öffne neuen Browser → Klicke "dieser Mobiltelefonnummer" → "trotzdem neues Konto erstellen" → Account ersetzen)',
+    testCount: 2,
   },
 ];
 
