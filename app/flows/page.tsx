@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface FlowStep {
   id: string;
@@ -16,6 +18,91 @@ interface Flow {
   description: string;
   category: 'registration' | 'login' | 'account-replace';
   steps: FlowStep[];
+}
+
+// PDF Export Funktion
+async function exportFlowToPDF(flow: Flow) {
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 15;
+  const contentWidth = pageWidth - (2 * margin);
+  
+  // Titel-Seite
+  pdf.setFontSize(24);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(flow.name, pageWidth / 2, 40, { align: 'center' });
+  
+  pdf.setFontSize(12);
+  pdf.setFont('helvetica', 'normal');
+  const descLines = pdf.splitTextToSize(flow.description, contentWidth);
+  pdf.text(descLines, pageWidth / 2, 60, { align: 'center' });
+  
+  pdf.setFontSize(10);
+  pdf.setTextColor(100);
+  pdf.text(`Generiert am: ${new Date().toLocaleDateString('de-DE')}`, pageWidth / 2, 80, { align: 'center' });
+  pdf.text(`Anzahl Schritte: ${flow.steps.length}`, pageWidth / 2, 90, { align: 'center' });
+  
+  // Für jeden Schritt eine neue Seite mit großem Screenshot
+  for (let i = 0; i < flow.steps.length; i++) {
+    const step = flow.steps[i];
+    
+    pdf.addPage();
+    
+    // Schritt-Nummer und Titel
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0);
+    pdf.text(`Schritt ${i + 1}: ${step.title}`, margin, 20);
+    
+    // Beschreibung
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(60);
+    const stepDescLines = pdf.splitTextToSize(step.description, contentWidth);
+    pdf.text(stepDescLines, margin, 30);
+    
+    // Screenshot laden und einfügen (großes Bild)
+    try {
+      const response = await fetch(step.screenshot);
+      const blob = await response.blob();
+      const imageDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+      
+      // Berechne Bild-Dimensionen (möglichst groß, aber passend)
+      const img = new window.Image();
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.src = imageDataUrl;
+      });
+      
+      const imgAspectRatio = img.width / img.height;
+      const availableHeight = pageHeight - 60;
+      
+      let imgWidth = contentWidth;
+      let imgHeight = imgWidth / imgAspectRatio;
+      
+      if (imgHeight > availableHeight) {
+        imgHeight = availableHeight;
+        imgWidth = imgHeight * imgAspectRatio;
+      }
+      
+      const xPos = (pageWidth - imgWidth) / 2;
+      pdf.addImage(imageDataUrl, 'PNG', xPos, 50, imgWidth, imgHeight);
+      
+    } catch (error) {
+      console.error(`Fehler beim Laden von Screenshot ${i + 1}:`, error);
+      pdf.setTextColor(255, 0, 0);
+      pdf.text('Screenshot konnte nicht geladen werden', margin, 60);
+    }
+  }
+  
+  // PDF speichern
+  const fileName = `${flow.name.replace(/[^a-z0-9]/gi, '_')}_Flow.pdf`;
+  pdf.save(fileName);
 }
 
 const flows: Flow[] = [
@@ -66,36 +153,80 @@ const flows: Flow[] = [
         title: 'Kundenbereich nach Registrierung',
         description: 'Registrierung erfolgreich! Benutzer ist im Kundenbereich eingeloggt und sieht seine Übersichtsseite.',
         screenshot: '/flow-screenshots/email-registration/07-kundenbereich-after-registration.png'
+      }
+    ]
+  },
+  {
+    id: 'phone-registration-happy-path',
+    name: 'Telefon-Registrierung Happy Path',
+    description: 'Standard-Registrierung mit Telefonnummer - kompletter Flow mit E-Mail- und SMS-TAN-Verifizierung bis zum Kundenbereich.',
+    category: 'registration',
+    steps: [
+      {
+        id: '01',
+        title: 'Login-Screen (leer)',
+        description: 'Der Benutzer startet auf dem Login-Screen.',
+        screenshot: '/flow-screenshots/phone-registration/01-login-screen-empty.png'
+      },
+      {
+        id: '02',
+        title: 'Telefonnummer eingegeben',
+        description: 'Telefonnummer wurde eingegeben, Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/phone-registration/02-phone-entered.png'
+      },
+      {
+        id: '03',
+        title: 'E-Mail-Eingabe-Screen (leer)',
+        description: 'System fragt nach E-Mail-Adresse für die Verifizierung.',
+        screenshot: '/flow-screenshots/phone-registration/03-email-input-screen-empty.png'
+      },
+      {
+        id: '04',
+        title: 'E-Mail eingegeben',
+        description: 'E-Mail-Adresse wurde eingegeben, Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/phone-registration/04-email-entered.png'
+      },
+      {
+        id: '05',
+        title: 'Registrierungsformular (leer)',
+        description: 'Das Registrierungsformular erscheint mit Feldern für Vorname, Nachname und Passwort.',
+        screenshot: '/flow-screenshots/phone-registration/05-registration-form-empty.png'
+      },
+      {
+        id: '06',
+        title: 'Registrierungsformular ausgefüllt',
+        description: 'Alle Felder sind ausgefüllt (Vorname: Loyalty, Nachname: Testing, Passwort), Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/phone-registration/06-registration-form-filled.png'
+      },
+      {
+        id: '07',
+        title: 'E-Mail-TAN-Eingabe-Screen (leer)',
+        description: 'Benutzer erhält eine E-Mail mit TAN-Code zur Verifizierung der E-Mail-Adresse.',
+        screenshot: '/flow-screenshots/phone-registration/07-email-tan-input-screen-empty.png'
       },
       {
         id: '08',
-        title: 'Kundenbereich (Cookie-Banner geschlossen)',
-        description: 'Cookie-Banner wurde geschlossen für bessere Übersicht.',
-        screenshot: '/flow-screenshots/email-registration/08-kundenbereich-clean.png'
+        title: 'E-Mail-TAN eingegeben',
+        description: 'E-Mail-TAN wurde eingegeben und wird verifiziert.',
+        screenshot: '/flow-screenshots/phone-registration/08-email-tan-entered.png'
       },
       {
         id: '09',
-        title: 'Anmelden & Sicherheit',
-        description: 'Benutzer navigiert zu den Sicherheitseinstellungen.',
-        screenshot: '/flow-screenshots/email-registration/09-anmelden-sicherheit-page.png'
+        title: 'SMS-TAN-Eingabe-Screen (leer)',
+        description: 'Benutzer erhält eine SMS mit TAN-Code zur Verifizierung der Telefonnummer.',
+        screenshot: '/flow-screenshots/phone-registration/09-sms-tan-input-screen-empty.png'
       },
       {
         id: '10',
-        title: 'Kundenkonto löschen Dialog (leer)',
-        description: 'Dialog zur Konto-Löschung erscheint. Benutzer muss Checkbox bestätigen.',
-        screenshot: '/flow-screenshots/email-registration/10-delete-account-dialog-empty.png'
+        title: 'SMS-TAN eingegeben',
+        description: 'SMS-TAN wurde eingegeben und wird verifiziert. System leitet automatisch weiter.',
+        screenshot: '/flow-screenshots/phone-registration/10-sms-tan-entered.png'
       },
       {
         id: '11',
-        title: 'Löschung bestätigt',
-        description: 'Checkbox wurde gesetzt, Benutzer klickt auf "entfernen".',
-        screenshot: '/flow-screenshots/email-registration/11-delete-account-dialog-checked.png'
-      },
-      {
-        id: '12',
-        title: 'Nach Account-Löschung',
-        description: 'Account wurde erfolgreich gelöscht.',
-        screenshot: '/flow-screenshots/email-registration/12-after-account-deletion.png'
+        title: 'Kundenbereich nach Registrierung',
+        description: 'Registrierung erfolgreich! Benutzer ist im Kundenbereich eingeloggt mit verifizierter Telefonnummer und E-Mail.',
+        screenshot: '/flow-screenshots/phone-registration/11-kundenbereich-after-registration.png'
       }
     ]
   },
@@ -261,9 +392,20 @@ export default function FlowsPage() {
                   <p className="text-gray-300 text-sm mb-4">
                     {flow.description}
                   </p>
-                  <div className="flex items-center text-gray-400 text-sm">
-                    <span className="mr-2">📊</span>
-                    <span>{flow.steps.length} Schritte</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-gray-400 text-sm">
+                      <span className="mr-2">📊</span>
+                      <span>{flow.steps.length} Schritte</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        exportFlowToPDF(flow);
+                      }}
+                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      📄 PDF Export
+                    </button>
                   </div>
                 </div>
               );
@@ -274,13 +416,21 @@ export default function FlowsPage() {
         {/* Flow Detail View */}
         {selectedFlow && !selectedStep && (
           <div className="space-y-6">
-            {/* Back Button */}
-            <button
-              onClick={() => setSelectedFlow(null)}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white flex items-center gap-2 transition-colors"
-            >
-              ← Zurück zur Übersicht
-            </button>
+            {/* Back Button and PDF Export */}
+            <div className="flex items-center justify-between gap-4">
+              <button
+                onClick={() => setSelectedFlow(null)}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white flex items-center gap-2 transition-colors"
+              >
+                ← Zurück zur Übersicht
+              </button>
+              <button
+                onClick={() => exportFlowToPDF(selectedFlow)}
+                className="px-6 py-3 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 rounded-lg text-white flex items-center gap-2 transition-all hover:scale-105 font-semibold shadow-lg"
+              >
+                📄 Flow als PDF exportieren
+              </button>
+            </div>
 
             {/* Flow Header */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
