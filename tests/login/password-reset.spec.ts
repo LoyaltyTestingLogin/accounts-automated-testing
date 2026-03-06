@@ -4,6 +4,7 @@ import { getAccountCredentials } from '../fixtures/accounts';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl } from '../helpers/environment';
+import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -11,6 +12,8 @@ dotenv.config();
 test.describe('CHECK24 Login - Passwort Reset', () => {
 
   test('Erfolgreicher Passwort-Reset - Account mit nur E-Mail', async ({ browser }) => {
+    enableAutoScreenshots('login-password-reset');
+    
     const context = await browser.newContext();
     const page = await context.newPage();
     
@@ -23,6 +26,8 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       const loginUrl = getLoginUrl();
       await page.goto(loginUrl);
       await page.waitForLoadState('networkidle');
+      
+      await takeAutoScreenshot(page, 'login-screen-empty');
 
       // SCHRITT 1: E-Mail eingeben
       console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
@@ -31,6 +36,8 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       await page.waitForTimeout(300);
       await emailInput.fill(credentials.email);
       await page.waitForTimeout(500);
+      
+      await takeAutoScreenshot(page, 'email-entered');
 
       // "Weiter" klicken
       console.log('➡️  Klicke auf "Weiter"-Button...');

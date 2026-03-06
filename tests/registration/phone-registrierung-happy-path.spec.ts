@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test-hooks';
 import { expectLoginSuccess } from '../helpers/auth';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
+import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,6 +16,8 @@ dotenv.config();
 test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
 
   test('Erfolgreiche Phone-Registrierung', async ({ browser }) => {
+    enableAutoScreenshots('phone-registration');
+    
     const context = await browser.newContext();
     const page = await context.newPage();
     
@@ -28,6 +31,8 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       }
       await page.goto(baseUrl);
       await page.waitForLoadState('networkidle');
+      
+      await takeAutoScreenshot(page, 'login-screen-empty');
 
       // SCHRITT 1: Generiere eindeutige Phone mit aktueller Uhrzeit
       const now = new Date();
@@ -42,6 +47,8 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       await page.waitForTimeout(300);
       await phoneInput.fill(phoneNumber);
       await page.waitForTimeout(500);
+      
+      await takeAutoScreenshot(page, 'phone-entered');
 
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"-Button...');
@@ -49,6 +56,8 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
       await page.waitForTimeout(1000);
+      
+      await takeAutoScreenshot(page, 'email-input-screen');
 
       // SCHRITT 2: E-Mail-Adresse eingeben
       const timestamp = new Date().toISOString()
@@ -62,6 +71,8 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       await emailInput.fill(email);
       console.log('   ✅ E-Mail eingegeben');
       await page.waitForTimeout(500);
+      
+      await takeAutoScreenshot(page, 'email-entered');
 
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"-Button...');
@@ -69,6 +80,8 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       await weiterButton2.click();
       console.log('✅ "Weiter" wurde geklickt');
       await page.waitForTimeout(1000);
+      
+      await takeAutoScreenshot(page, 'registration-form-empty');
 
       // SCHRITT 3: Registrierungsformular ausfüllen
       console.log('📝 SCHRITT 3: Fülle Registrierungsformular aus...');
@@ -98,6 +111,8 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       await password2.waitFor({ state: 'visible', timeout: 10000 });
       await password2.fill('1qay1qay');
       console.log('   ✅ Passwort in zweites Feld eingegeben');
+      
+      await takeAutoScreenshot(page, 'registration-form-filled');
 
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"-Button...');
@@ -126,6 +141,10 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
           120
         );
         throw error;
+      }
+
+      if (!emailTanEmail) {
+        throw new Error('E-Mail-TAN E-Mail nicht erhalten');
       }
 
       // E-Mail-TAN-Code extrahieren
@@ -172,15 +191,21 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       if (!emailTanInput) {
         throw new Error('Konnte E-Mail-TAN-Eingabefeld nicht finden');
       }
+      
+      await takeAutoScreenshot(page, 'email-tan-input-screen');
 
       await page.waitForTimeout(500);
       await emailTanInput.fill(emailTanCode);
       console.log('✅ E-Mail-TAN-Code eingegeben');
+      
+      await takeAutoScreenshot(page, 'email-tan-entered');
 
       // SCHRITT 6: Warte auf nächsten Screen (SMS-Verifizierung)
       console.log('⏳ SCHRITT 6: Warte auf SMS-Verifizierungs-Screen...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
       await page.waitForTimeout(1000);
+      
+      await takeAutoScreenshot(page, 'sms-verification-screen');
 
       // SCHRITT 7: SMS-Verifizierung - TAN aus weitergeleiteter SMS-E-Mail holen
       console.log('📱 SCHRITT 7: Warte auf SMS-TAN-Code (weitergeleitet per E-Mail)...');
@@ -201,6 +226,10 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
           120
         );
         throw error;
+      }
+
+      if (!smsTanEmail) {
+        throw new Error('SMS-TAN E-Mail nicht erhalten');
       }
 
       // SMS-TAN-Code extrahieren
@@ -245,10 +274,14 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       if (!smsTanInput) {
         throw new Error('Konnte SMS-TAN-Eingabefeld nicht finden');
       }
+      
+      await takeAutoScreenshot(page, 'sms-tan-input-screen');
 
       await page.waitForTimeout(500);
       await smsTanInput.fill(smsTanCode);
       console.log('✅ SMS-TAN-Code eingegeben');
+      
+      await takeAutoScreenshot(page, 'sms-tan-entered');
 
       // SCHRITT 9: Warte auf Auto-Submit und Callback-Weiterleitung
       console.log('⏳ SCHRITT 9: Warte auf Auto-Submit und Weiterleitung zum Kundenbereich...');
@@ -269,6 +302,8 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       // SCHRITT 10: c24session Cookie verifizieren
       console.log('🔍 SCHRITT 10: Prüfe c24session Cookie...');
       await expectLoginSuccess(page);
+      
+      await takeAutoScreenshot(page, 'kundenbereich');
 
       // SCHRITT 11: Warte auf Willkommensmail
       console.log('📧 SCHRITT 11: Warte auf Willkommensmail...');
@@ -292,6 +327,9 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
       }
 
       console.log(`✅ Phone-Registrierung vollständig erfolgreich für: ${phoneNumber} / ${email}`);
+      
+      // Test erfolgreich - Screenshots übernehmen
+      commitScreenshots();
 
       // SCHRITT 12: Konto wieder löschen
       console.log('🗑️  SCHRITT 12: Lösche das neu erstellte Konto...');
@@ -345,6 +383,7 @@ test.describe('CHECK24 Registrierung - Phone Happy Path', () => {
 
       console.log('✅ Konto erfolgreich gelöscht');
     } finally {
+      disableAutoScreenshots();
       await context.close();
     }
   });

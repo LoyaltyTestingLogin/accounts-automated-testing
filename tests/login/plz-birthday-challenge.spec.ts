@@ -3,6 +3,7 @@ import { expectLoginSuccess, logout } from '../helpers/auth';
 import { getEmailClient, EmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl, getKundenbereichUrl, getEnvironment } from '../helpers/environment';
+import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -775,6 +776,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
     
     // TEIL 2: Passwort-Reset mit PLZ/Birthday Challenge
     console.log('\n🔐 TEIL 2: Teste Passwort-Reset mit PLZ/Birthday Challenge...\n');
+    
+    enableAutoScreenshots('login-plz-birthday-challenge');
 
     const resetContext = await browser.newContext();
     const resetPage = await resetContext.newPage();
@@ -785,6 +788,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log(`🌐 Navigiere zu: ${loginUrl}`);
       await resetPage.goto(loginUrl);
       await resetPage.waitForLoadState('networkidle');
+      
+      await takeAutoScreenshot(resetPage, 'login-screen-leer');
 
       // SCHRITT 1: Phone-Nummer eingeben (nicht E-Mail!)
       console.log(`📱 SCHRITT 1: Gebe Phone-Nummer ein: ${phoneNumber}`);
@@ -792,6 +797,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       await phoneLoginInput.waitFor({ state: 'visible', timeout: 10000 });
       await phoneLoginInput.fill(phoneNumber);
       console.log('✅ Phone-Nummer eingegeben');
+      
+      await takeAutoScreenshot(resetPage, 'phone-eingegeben');
 
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"...');
@@ -832,6 +839,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       await passwordForgottenLink.click();
       console.log('✅ "Passwort vergessen?" geklickt');
       await resetPage.waitForTimeout(2000);
+      
+      await takeAutoScreenshot(resetPage, 'password-reset-selection-screen');
 
       // SCHRITT 3: Selection Screen - Wähle Phone/SMS TAN
       console.log('🔍 SCHRITT 3: Wähle SMS/Phone als Challenge-Methode...');
@@ -872,6 +881,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       }
 
       await resetPage.waitForTimeout(1000);
+      await takeAutoScreenshot(resetPage, 'sms-option-ausgewaehlt');
       
       // Klick auf "Code senden" oder "Weiter"
       console.log('➡️  Klicke auf "Code senden"...');
@@ -1009,6 +1019,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('🎂 SCHRITT 6: Gebe Geburtsdatum für PLZ/Birthday Challenge ein...');
       console.log('📍 Aktuelle URL:', resetPage.url());
       
+      await takeAutoScreenshot(resetPage, 'plz-birthday-challenge-screen-leer');
+      
       // Suche nach Geburtsdatum-Eingabefeld
       const birthdayChallengSelectors = [
         'input[name*="birthday"]',
@@ -1078,6 +1090,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       }
       
       console.log('✅ Geburtsdatum korrekt eingegeben');
+      await takeAutoScreenshot(resetPage, 'geburtsdatum-eingegeben');
       
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"...');
@@ -1116,6 +1129,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       
       console.log('✅ PLZ/Birthday Challenge erfolgreich - erster Screen abgeschlossen');
       console.log('📍 Aktuelle URL:', resetPage.url());
+      await takeAutoScreenshot(resetPage, 'nach-erstem-weiter');
       
       // SCHRITT 6b: Zweiter "Weiter"-Button auf dem nächsten Screen
       console.log('➡️  SCHRITT 6b: Klicke auf "Weiter" auf dem zweiten Screen...');
@@ -1185,13 +1199,18 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       if (c24sessionCookie) {
         console.log('✅ c24session Cookie gefunden!');
         console.log(`   Value: ${c24sessionCookie.value.substring(0, 20)}...`);
+        await takeAutoScreenshot(resetPage, 'kundenbereich-erfolgreich');
       } else {
         throw new Error('❌ c24session Cookie NICHT gefunden - Login fehlgeschlagen!');
       }
       
       console.log('\n✅ TEIL 2 ABGESCHLOSSEN (Phone TAN)\n');
       
+      // Test erfolgreich - Screenshots übernehmen
+      commitScreenshots();
+      
     } finally {
+      disableAutoScreenshots();
       await resetContext.close();
     }
       

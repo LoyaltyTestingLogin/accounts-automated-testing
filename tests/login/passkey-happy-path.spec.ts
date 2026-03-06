@@ -146,6 +146,8 @@ test.describe('CHECK24 Login - Passkey', () => {
         }
       }
       
+      await page.waitForTimeout(2000);
+      
       // 7. c24session Cookie prüfen
       console.log('🍪 Prüfe c24session Cookie...');
       const cookies = await page.context().cookies();

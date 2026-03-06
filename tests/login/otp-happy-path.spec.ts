@@ -4,6 +4,7 @@ import { getAccountCredentials } from '../fixtures/accounts';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl } from '../helpers/environment';
+import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -24,6 +25,8 @@ async function startOtpLogin(page: any, email: string) {
   const loginUrl = getLoginUrl();
   await page.goto(loginUrl);
   await page.waitForLoadState('networkidle');
+  
+  await takeAutoScreenshot(page, 'login-screen-empty');
 
   // SCHRITT 1: E-Mail eingeben
   const emailInput = page.locator('input[type="email"], input[name="email"], input[name="username"]').first();
@@ -33,6 +36,8 @@ async function startOtpLogin(page: any, email: string) {
   await page.waitForTimeout(300);
   await emailInput.fill(email);
   await page.waitForTimeout(500);
+  
+  await takeAutoScreenshot(page, 'email-entered');
 
   // Klick auf "Weiter"-Button
   const weiterButton = page.locator('button[type="submit"]').first();
@@ -41,6 +46,8 @@ async function startOtpLogin(page: any, email: string) {
   await weiterButton.click({ force: true });
   console.log('✅ "Weiter" wurde geklickt');
   await page.waitForTimeout(800);
+  
+  await takeAutoScreenshot(page, 'otp-option-visible');
 
   // SCHRITT 2: Auf "mit Einmalcode anmelden" klicken
   console.log('🔑 SCHRITT 2: Suche "mit Einmalcode anmelden"...');
@@ -54,6 +61,8 @@ async function startOtpLogin(page: any, email: string) {
   await otpElement.click();
   console.log('✅ "mit Einmalcode anmelden" wurde geklickt');
   await page.waitForTimeout(1500);
+  
+  await takeAutoScreenshot(page, 'otp-screen-before-code-send');
 }
 
 /**
@@ -71,6 +80,8 @@ async function clickCodeSenden(page: any) {
   await codeSendenButton.first().click();
   console.log('✅ "Code senden" wurde geklickt - Code wird versendet');
   await page.waitForTimeout(2000);
+  
+  await takeAutoScreenshot(page, 'otp-input-screen');
 }
 
 /**
@@ -150,6 +161,8 @@ async function enterOtpCode(page: any) {
   await otpInput.fill(otpCode);
   console.log('✅ OTP-Code eingegeben');
   await page.waitForTimeout(500);
+  
+  await takeAutoScreenshot(page, 'otp-entered');
 
   return otpCode;
 }
@@ -228,12 +241,15 @@ async function submitOtpLogin(page: any) {
 test.describe('CHECK24 Login - OTP Happy Path', () => {
   
   test('Erfolgreicher OTP-Login - Account mit nur E-Mail', async ({ page }) => {
-    // Account mit nur E-Mail-Adresse verwenden
-    const credentials = getAccountCredentials('EMAIL_ONLY');
-    console.log(`📧 Verwende Test-Account: ${credentials.account.description}`);
+    enableAutoScreenshots('login-otp');
+    
+    try {
+      // Account mit nur E-Mail-Adresse verwenden
+      const credentials = getAccountCredentials('EMAIL_ONLY');
+      console.log(`📧 Verwende Test-Account: ${credentials.account.description}`);
 
-    // OTP-Login starten (E-Mail + "Mit Einmalcode anmelden")
-    await startOtpLogin(page, credentials.email);
+      // OTP-Login starten (E-Mail + "Mit Einmalcode anmelden")
+      await startOtpLogin(page, credentials.email);
 
     // "Code senden" klicken
     await clickCodeSenden(page);
@@ -308,13 +324,19 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
       await page.waitForTimeout(1000);
     }
 
-    // Login-Erfolg verifizieren (c24session Cookie prüfen)
-    await expectLoginSuccess(page);
+      // Login-Erfolg verifizieren (c24session Cookie prüfen)
+      await expectLoginSuccess(page);
 
-    console.log(`✅ OTP-Login vollständig erfolgreich für: ${credentials.email}`);
+      console.log(`✅ OTP-Login vollständig erfolgreich für: ${credentials.email}`);
+      
+      // Test erfolgreich - Screenshots übernehmen
+      commitScreenshots();
 
-    // Logout
-    await logout(page);
+      // Logout
+      await logout(page);
+    } finally {
+      disableAutoScreenshots();
+    }
   });
 
   test('Erfolgreicher OTP-Login - Combined Account (TAN per E-Mail)', async ({ browser }) => {

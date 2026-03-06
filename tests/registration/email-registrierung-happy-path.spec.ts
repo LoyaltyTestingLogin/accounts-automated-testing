@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test-hooks';
 import { expectLoginSuccess } from '../helpers/auth';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
+import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,6 +16,8 @@ dotenv.config();
 test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
 
   test('Erfolgreiche E-Mail-Registrierung', async ({ browser }) => {
+    enableAutoScreenshots('email-registration');
+    
     const context = await browser.newContext();
     const page = await context.newPage();
     
@@ -28,6 +31,8 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       }
       await page.goto(baseUrl);
       await page.waitForLoadState('networkidle');
+      
+      await takeAutoScreenshot(page, 'login-screen-empty');
 
       // SCHRITT 1: Generiere eindeutige E-Mail-Adresse mit Timestamp
       const timestamp = new Date().toISOString()
@@ -41,6 +46,8 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       await page.waitForTimeout(300);
       await emailInput.fill(email);
       await page.waitForTimeout(500);
+      
+      await takeAutoScreenshot(page, 'email-entered');
 
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"-Button...');
@@ -48,6 +55,8 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
       await page.waitForTimeout(1000);
+      
+      await takeAutoScreenshot(page, 'registration-form-empty');
 
       // SCHRITT 2: Registrierungsformular ausfüllen
       console.log('📝 SCHRITT 2: Fülle Registrierungsformular aus...');
@@ -77,6 +86,8 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       await password2.waitFor({ state: 'visible', timeout: 10000 });
       await password2.fill('1qay1qay');
       console.log('   ✅ Passwort in zweites Feld eingegeben');
+      
+      await takeAutoScreenshot(page, 'registration-form-filled');
 
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"-Button...');
@@ -151,10 +162,14 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       if (!tanInput) {
         throw new Error('Konnte TAN-Eingabefeld nicht finden');
       }
+      
+      await takeAutoScreenshot(page, 'tan-input-screen');
 
       await page.waitForTimeout(500);
       await tanInput.fill(tanCode);
       console.log('✅ TAN-Code eingegeben (6-stellig komplett)');
+      
+      await takeAutoScreenshot(page, 'tan-entered');
 
       // SCHRITT 5: Warte auf Auto-Submit und Callback-Weiterleitung
       console.log('⏳ SCHRITT 5: Warte auf Auto-Submit und Weiterleitung zum Kundenbereich...');
@@ -175,6 +190,8 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       // SCHRITT 6: c24session Cookie verifizieren
       console.log('🔍 SCHRITT 6: Prüfe c24session Cookie...');
       await expectLoginSuccess(page);
+      
+      await takeAutoScreenshot(page, 'kundenbereich');
 
       // SCHRITT 7: Warte auf Willkommensmail
       console.log('📧 SCHRITT 7: Warte auf Willkommensmail...');
@@ -198,6 +215,9 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       }
 
       console.log(`✅ E-Mail-Registrierung vollständig erfolgreich für: ${email}`);
+      
+      // Test erfolgreich - Screenshots übernehmen
+      commitScreenshots();
 
       // SCHRITT 8: Konto wieder löschen
       console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto...');
@@ -251,6 +271,7 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
 
       console.log('✅ Konto erfolgreich gelöscht');
     } finally {
+      disableAutoScreenshots();
       await context.close();
     }
   });

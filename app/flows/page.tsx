@@ -509,6 +509,62 @@ const flows: Flow[] = [
         screenshot: '/flow-screenshots/login-password-reset/10-password-changed-success.png'
       }
     ]
+  },
+  {
+    id: 'login-plz-birthday-challenge',
+    name: 'Password-Reset mit PLZ/Geburtstag-Challenge',
+    description: 'Passwort-Reset-Flow mit zusätzlicher Sicherheitsabfrage für Geburtsdatum - wird bei Phone-Accounts ohne E-Mail verwendet.',
+    category: 'login',
+    steps: [
+      {
+        id: '01',
+        title: 'Login-Screen (leer)',
+        description: 'Der Benutzer startet auf dem Login-Screen.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/01-login-screen-leer.png'
+      },
+      {
+        id: '02',
+        title: 'Telefonnummer eingegeben',
+        description: 'Telefonnummer wurde eingegeben.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/02-phone-eingegeben.png'
+      },
+      {
+        id: '03',
+        title: 'Password-Reset Selection Screen',
+        description: 'Nach Klick auf "Passwort vergessen?" erscheint Auswahlbildschirm für Reset-Methode.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/03-password-reset-selection-screen.png'
+      },
+      {
+        id: '04',
+        title: 'SMS-Option ausgewählt',
+        description: 'SMS/Telefon als Challenge-Methode wurde ausgewählt.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/04-sms-option-ausgewaehlt.png'
+      },
+      {
+        id: '05',
+        title: 'PLZ/Geburtstag-Challenge (leer)',
+        description: 'Nach SMS-TAN-Eingabe erscheint die Geburtsdatum-Challenge als zusätzliche Sicherheitsabfrage.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/05-plz-birthday-challenge-screen-leer.png'
+      },
+      {
+        id: '06',
+        title: 'Geburtsdatum eingegeben',
+        description: 'Geburtsdatum wurde zur Verifizierung eingegeben.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/06-geburtsdatum-eingegeben.png'
+      },
+      {
+        id: '07',
+        title: 'Nach erstem "Weiter"',
+        description: 'Erster Schritt der Challenge abgeschlossen, zweiter Bestätigungsscreen.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/07-nach-erstem-weiter.png'
+      },
+      {
+        id: '08',
+        title: 'Kundenbereich erfolgreich',
+        description: 'Nach erfolgreicher PLZ/Geburtstag-Verifizierung wird der Benutzer in den Kundenbereich eingeloggt.',
+        screenshot: '/flow-screenshots/login-plz-birthday-challenge/08-kundenbereich-erfolgreich.png'
+      }
+    ]
   }
 ];
 

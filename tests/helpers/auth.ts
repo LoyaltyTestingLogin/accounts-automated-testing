@@ -2,6 +2,7 @@ import { Page, expect } from '@playwright/test';
 import dotenv from 'dotenv';
 import { getEmailClient } from './email';
 import { getLoginUrl, getEnvironmentName } from './environment';
+import { takeAutoScreenshot } from './screenshots';
 
 dotenv.config();
 
@@ -25,6 +26,8 @@ export async function loginWithPassword(page: Page, email: string, password: str
 
   // Warten bis Seite geladen ist
   await page.waitForLoadState('networkidle');
+  
+  await takeAutoScreenshot(page, 'login-screen-empty');
 
   // SCHRITT 1: E-Mail/Benutzername eingeben
   const emailInput = page.locator('input[type="email"], input[name="email"], input[name="username"], input[id*="email"], input[placeholder*="E-Mail"]').first();
@@ -34,6 +37,8 @@ export async function loginWithPassword(page: Page, email: string, password: str
   await page.waitForTimeout(200);
   await emailInput.fill(email);
   await page.waitForTimeout(300);
+  
+  await takeAutoScreenshot(page, 'email-entered');
 
   // Klick auf "Weiter"-Button
   const weiterButton = page.locator('button[type="submit"]').first();
@@ -54,6 +59,8 @@ export async function loginWithPassword(page: Page, email: string, password: str
   console.log('🔐 SCHRITT 2: Gebe Passwort ein...');
   await page.waitForTimeout(200);
   await passwordInput.fill(password, { force: true });
+  
+  await takeAutoScreenshot(page, 'password-entered');
   
   // Direkt Enter drücken nach Passwort-Eingabe (schnellster Weg)
   console.log('⏎  Drücke Enter zum Anmelden...');
@@ -174,6 +181,7 @@ export async function expectLoginSuccess(page: Page) {
   }
 
   console.log('✅ Login erfolgreich verifiziert - Kundenbereich geladen');
+  await takeAutoScreenshot(page, 'kundenbereich');
 }
 
 /**
@@ -421,6 +429,8 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
     console.log('ℹ️  Keine Login-Challenge erkannt - möglicherweise nicht erforderlich');
     return false;
   }
+  
+  await takeAutoScreenshot(page, 'challenge-screen');
 
   // SCHRITT 1.5: Bei Combined Account - Methode auswählen (falls challengeMethod angegeben)
   if (challengeMethod) {
@@ -707,6 +717,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   }
   
   await page.waitForTimeout(500);
+  await takeAutoScreenshot(page, 'challenge-tan-entered');
 
   // SCHRITT 6: Wieder auf "Weiter" klicken (oder Enter drücken)
   console.log('➡️  Schließe Login ab (Enter-Taste oder Weiter-Button)...');
@@ -787,6 +798,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   }
 
   console.log('✅ Login-Challenge abgeschlossen');
+  await takeAutoScreenshot(page, 'after-challenge-submit');
   
   // SCHRITT 7: Phone-Hinterlegungs-Screen überspringen (falls vorhanden)
   await page.waitForTimeout(1500);

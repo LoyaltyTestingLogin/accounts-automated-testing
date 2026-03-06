@@ -3,6 +3,7 @@ import { loginWithPassword, expectLoginSuccess, logout, handleLoginChallenge } f
 import { getAccountCredentials } from '../fixtures/accounts';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl } from '../helpers/environment';
+import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -13,15 +14,18 @@ dotenv.config();
  */
 test.describe('CHECK24 Login - Happy Path', () => {
   test('Erfolgreicher Login + Zweiter Login ohne Challenge', async ({ page }) => {
-    // Account mit nur E-Mail-Adresse verwenden
-    const credentials = getAccountCredentials('EMAIL_ONLY');
-    console.log(`📧 Verwende Test-Account: ${credentials.account.description}`);
-
-    // ===== ERSTER LOGIN MIT CHALLENGE =====
-    console.log('\n=== ERSTER LOGIN MIT CHALLENGE ===');
+    enableAutoScreenshots('login-password');
     
-    // Login durchführen (E-Mail + Passwort)
-    const { email } = await loginWithPassword(page, credentials.email, credentials.password);
+    try {
+      // Account mit nur E-Mail-Adresse verwenden
+      const credentials = getAccountCredentials('EMAIL_ONLY');
+      console.log(`📧 Verwende Test-Account: ${credentials.account.description}`);
+
+      // ===== ERSTER LOGIN MIT CHALLENGE =====
+      console.log('\n=== ERSTER LOGIN MIT CHALLENGE ===');
+      
+      // Login durchführen (E-Mail + Passwort)
+      const { email } = await loginWithPassword(page, credentials.email, credentials.password);
     console.log(`✅ Login-Daten eingegeben für: ${email}`);
 
     // Login-Challenge behandeln (Sicherheitsprüfung bei unbekanntem Gerät)
@@ -75,10 +79,12 @@ test.describe('CHECK24 Login - Happy Path', () => {
               break;
             } catch (e1) {
               try {
-                await page.evaluate((sel) => {
+                await page.evaluate((sel: string) => {
+                  // @ts-expect-error - document is available in browser context
                   const elements = document.querySelectorAll(sel);
                   if (elements.length > 0) {
-                    elements[0].click();
+                    // @ts-expect-error - HTMLElement is available in browser context
+                    (elements[0] as HTMLElement).click();
                     return true;
                   }
                   return false;
@@ -105,8 +111,10 @@ test.describe('CHECK24 Login - Happy Path', () => {
         // Als letzten Ausweg: Versuche den blocking layer direkt zu entfernen
         try {
           await page.evaluate(() => {
+            // @ts-expect-error - document is available in browser context
             const blockers = document.querySelectorAll('.c24-strict-blocking-layer, .c24-cookie-consent-wrapper');
-            blockers.forEach(el => el.remove());
+            // @ts-expect-error - Element is available in browser context
+            blockers.forEach((el: Element) => el.remove());
           });
           console.log('✅ Cookie-Banner-Layer via JavaScript entfernt');
         } catch (e) {
@@ -298,8 +306,9 @@ test.describe('CHECK24 Login - Happy Path', () => {
             // Methode 3: JavaScript direkter Input
             try {
               console.log('  📝 Versuche: JavaScript setValue...');
-              await page.evaluate(({ sel, pwd }) => {
-                const input = document.querySelector(sel);
+              await page.evaluate(({ sel, pwd }: { sel: string; pwd: string }) => {
+                // @ts-expect-error - document and HTMLInputElement are available in browser context
+                const input = document.querySelector(sel) as HTMLInputElement;
                 if (input) {
                   input.value = pwd;
                   input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -318,7 +327,8 @@ test.describe('CHECK24 Login - Happy Path', () => {
           }
         }
       } catch (e) {
-        console.log(`  ⚠️  Fehler bei Selektor ${selector}: ${e.message}`);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        console.log(`  ⚠️  Fehler bei Selektor ${selector}: ${errorMessage}`);
         continue;
       }
     }
@@ -466,12 +476,18 @@ test.describe('CHECK24 Login - Happy Path', () => {
       console.log(`⚠️  Unerwartete URL: ${finalUrl}`);
     }
     
-    console.log('✅ Zweiter Login vollständig erfolgreich OHNE Challenge');
-    
-    // Cleanup: Logout
-    await logout(page);
-    
-    console.log('✅ Test komplett erfolgreich: Erster Login + Zweiter Login ohne Challenge');
+      console.log('✅ Zweiter Login vollständig erfolgreich OHNE Challenge');
+      
+      // Test erfolgreich - Screenshots übernehmen
+      commitScreenshots();
+      
+      // Cleanup: Logout
+      await logout(page);
+      
+      console.log('✅ Test komplett erfolgreich: Erster Login + Zweiter Login ohne Challenge');
+    } finally {
+      disableAutoScreenshots();
+    }
   });
 
   test('Erfolgreicher Login - Combined Account mit Email-TAN (Selection)', async ({ browser }) => {
