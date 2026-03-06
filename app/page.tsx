@@ -330,13 +330,22 @@ export default function Dashboard() {
       {/* Header */}
       <header className="mb-8 flex justify-between items-start">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-bold text-gray-900">
-              Testimate
-            </h1>
-            <span className="px-3 py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-full shadow-sm">
-              by CHECK24
-            </span>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-4xl font-bold text-gray-900">
+                Testimate
+              </h1>
+              <span className="px-3 py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-full shadow-sm">
+                by CHECK24
+              </span>
+            </div>
+            <a
+              href="/flows"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg transition-all hover:scale-105 font-semibold"
+            >
+              <span>📸</span>
+              <span>Login & Registrierungs-Flows</span>
+            </a>
           </div>
           <p className="text-gray-600">
             Automatisiertes E2E Testing mit 24/7 Monitoring
