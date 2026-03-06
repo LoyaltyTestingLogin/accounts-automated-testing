@@ -20,6 +20,86 @@ interface Flow {
 
 const flows: Flow[] = [
   {
+    id: 'email-registration-happy-path',
+    name: 'E-Mail-Registrierung Happy Path',
+    description: 'Standard-Registrierung mit E-Mail-Adresse - der komplette Flow von der ersten Eingabe bis zum eingeloggten Kundenbereich.',
+    category: 'registration',
+    steps: [
+      {
+        id: '01',
+        title: 'Login-Screen (leer)',
+        description: 'Der Benutzer startet auf dem Login-Screen.',
+        screenshot: '/flow-screenshots/email-registration/01-login-screen-empty.png'
+      },
+      {
+        id: '02',
+        title: 'E-Mail eingegeben',
+        description: 'E-Mail-Adresse wurde eingegeben, Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/email-registration/02-email-entered.png'
+      },
+      {
+        id: '03',
+        title: 'Registrierungsformular (leer)',
+        description: 'Das Registrierungsformular erscheint mit Feldern für Vorname, Nachname und Passwort.',
+        screenshot: '/flow-screenshots/email-registration/03-registration-form-empty.png'
+      },
+      {
+        id: '04',
+        title: 'Registrierungsformular ausgefüllt',
+        description: 'Alle Felder sind ausgefüllt (Vorname: Loyalty, Nachname: Testing, Passwort), Benutzer klickt auf "Weiter".',
+        screenshot: '/flow-screenshots/email-registration/04-registration-form-filled.png'
+      },
+      {
+        id: '05',
+        title: 'TAN-Eingabe-Screen (leer)',
+        description: 'Benutzer erhält eine E-Mail mit TAN-Code und muss diesen eingeben.',
+        screenshot: '/flow-screenshots/email-registration/05-tan-input-screen-empty.png'
+      },
+      {
+        id: '06',
+        title: 'TAN eingegeben',
+        description: 'TAN-Code wurde eingegeben und wird verifiziert. System leitet automatisch weiter.',
+        screenshot: '/flow-screenshots/email-registration/06-tan-entered.png'
+      },
+      {
+        id: '07',
+        title: 'Kundenbereich nach Registrierung',
+        description: 'Registrierung erfolgreich! Benutzer ist im Kundenbereich eingeloggt und sieht seine Übersichtsseite.',
+        screenshot: '/flow-screenshots/email-registration/07-kundenbereich-after-registration.png'
+      },
+      {
+        id: '08',
+        title: 'Kundenbereich (Cookie-Banner geschlossen)',
+        description: 'Cookie-Banner wurde geschlossen für bessere Übersicht.',
+        screenshot: '/flow-screenshots/email-registration/08-kundenbereich-clean.png'
+      },
+      {
+        id: '09',
+        title: 'Anmelden & Sicherheit',
+        description: 'Benutzer navigiert zu den Sicherheitseinstellungen.',
+        screenshot: '/flow-screenshots/email-registration/09-anmelden-sicherheit-page.png'
+      },
+      {
+        id: '10',
+        title: 'Kundenkonto löschen Dialog (leer)',
+        description: 'Dialog zur Konto-Löschung erscheint. Benutzer muss Checkbox bestätigen.',
+        screenshot: '/flow-screenshots/email-registration/10-delete-account-dialog-empty.png'
+      },
+      {
+        id: '11',
+        title: 'Löschung bestätigt',
+        description: 'Checkbox wurde gesetzt, Benutzer klickt auf "entfernen".',
+        screenshot: '/flow-screenshots/email-registration/11-delete-account-dialog-checked.png'
+      },
+      {
+        id: '12',
+        title: 'Nach Account-Löschung',
+        description: 'Account wurde erfolgreich gelöscht.',
+        screenshot: '/flow-screenshots/email-registration/12-after-account-deletion.png'
+      }
+    ]
+  },
+  {
     id: 'account-replace-email',
     name: 'Account Replace - E-Mail-Adresse wiederverwenden',
     description: 'Zeigt den kompletten Flow, wie ein Benutzer einen bestehenden Account mit derselben E-Mail-Adresse ersetzt.',
