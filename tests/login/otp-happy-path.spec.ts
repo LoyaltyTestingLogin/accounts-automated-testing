@@ -29,7 +29,7 @@ async function startOtpLogin(page: any, email: string) {
   await takeAutoScreenshot(page, 'login-screen-empty');
 
   // SCHRITT 1: E-Mail eingeben
-  const emailInput = page.locator('input[type="email"], input[name="email"], input[name="username"]').first();
+  const emailInput = page.locator('#cl_login');
   await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   
   console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
@@ -40,7 +40,7 @@ async function startOtpLogin(page: any, email: string) {
   await takeAutoScreenshot(page, 'email-entered');
 
   // Klick auf "Weiter"-Button
-  const weiterButton = page.locator('button[type="submit"]').first();
+  const weiterButton = page.locator('#c24-uli-login-btn');
   console.log('➡️  Klicke auf "Weiter"-Button...');
   await page.waitForTimeout(300);
   await weiterButton.click({ force: true });
@@ -52,8 +52,7 @@ async function startOtpLogin(page: any, email: string) {
   // SCHRITT 2: Auf "mit Einmalcode anmelden" klicken
   console.log('🔑 SCHRITT 2: Suche "mit Einmalcode anmelden"...');
   
-  // Der Text ist in einem SPAN-Element - verwende getByText
-  const otpElement = page.getByText('mit Einmalcode anmelden', { exact: true });
+  const otpElement = page.locator('.c24-uli-trigger-otp-button');
   await otpElement.waitFor({ state: 'visible', timeout: 10000 });
   
   console.log('✅ "mit Einmalcode anmelden" Element gefunden');
@@ -68,16 +67,26 @@ async function startOtpLogin(page: any, email: string) {
 /**
  * Helper-Funktion: Klickt auf "Code senden" Button
  */
-async function clickCodeSenden(page: any) {
+async function clickCodeSenden(page: any, hasSelection: boolean = false) {
   console.log('📧 Suche "Code senden" Button...');
   
-  // Es gibt mehrere "Code senden" Buttons - verwende getByRole und filtere nach sichtbarem
-  const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
-  await codeSendenButton.first().waitFor({ state: 'visible', timeout: 10000 });
+  // Es gibt zwei verschiedene "Code senden" Buttons:
+  // 1. #c24-uli-lptan-send-btn - für EMAIL_ONLY Account (kein Selection Screen)
+  // 2. #c24-uli-pwr-choose-btn - für Combined Account (nach Selection Screen)
   
-  console.log('✅ "Code senden" Button gefunden');
+  let codeSendenButton;
+  if (hasSelection) {
+    // Combined Account mit Selection Screen
+    codeSendenButton = page.locator('#c24-uli-pwr-choose-btn');
+    console.log('✅ "Code senden" Button (Selection Screen: #c24-uli-pwr-choose-btn)');
+  } else {
+    // EMAIL_ONLY Account ohne Selection
+    codeSendenButton = page.locator('#c24-uli-lptan-send-btn');
+    console.log('✅ "Code senden" Button (Normal: #c24-uli-lptan-send-btn)');
+  }
   
-  await codeSendenButton.first().click();
+  await codeSendenButton.waitFor({ state: 'attached', timeout: 10000 });
+  await codeSendenButton.click({ force: true });
   console.log('✅ "Code senden" wurde geklickt - Code wird versendet');
   await page.waitForTimeout(2000);
   
@@ -123,42 +132,15 @@ async function enterOtpCode(page: any) {
 
   console.log(`🔑 OTP-Code erhalten: ${otpCode}`);
 
-  // OTP-Code in Eingabefeld eintragen - suche sichtbares Feld
+  // OTP-Code in Eingabefeld eintragen
   console.log('🔍 Suche OTP-Eingabefeld...');
   
-  const otpInputSelectors = [
-    'input[id*="tan"]',
-    'input[id*="code"]',
-    'input[name*="tan"]',
-    'input[placeholder*="Code"]',
-    'input[type="tel"]:not([name*="phone"])',
-    'input[type="text"]',
-  ];
-
-  let otpInput = null;
-  for (const selector of otpInputSelectors) {
-    try {
-      const inputs = await page.locator(selector).all();
-      for (const input of inputs) {
-        const isVisible = await input.isVisible().catch(() => false);
-        if (isVisible) {
-          otpInput = input;
-          console.log(`✅ OTP-Eingabefeld gefunden mit ${selector}`);
-          break;
-        }
-      }
-      if (otpInput) break;
-    } catch (e) {
-      continue;
-    }
-  }
-
-  if (!otpInput) {
-    throw new Error('OTP-Eingabefeld nicht gefunden');
-  }
+  const otpInput = page.locator('.c24-uli-input-splitted').first();
+  await otpInput.waitFor({ state: 'attached', timeout: 10000 });
+  console.log('✅ OTP-Eingabefeld gefunden');
   
   await page.waitForTimeout(500);
-  await otpInput.fill(otpCode);
+  await otpInput.fill(otpCode, { force: true });
   console.log('✅ OTP-Code eingegeben');
   await page.waitForTimeout(500);
   
@@ -172,70 +154,138 @@ async function enterOtpCode(page: any) {
  */
 async function submitOtpLogin(page: any) {
   console.log('➡️  Schließe OTP-Login ab...');
-  
-  // Einfachster Weg: Enter drücken im Input-Feld
-  try {
-    const otpInputs = await page.locator('input[type="text"], input[type="tel"]').all();
-    for (const input of otpInputs) {
-      const isVisible = await input.isVisible().catch(() => false);
-      if (isVisible) {
-        await input.press('Enter');
-        console.log('✅ Enter gedrückt im OTP-Feld');
-        await page.waitForLoadState('networkidle', { timeout: 30000 });
-        return;
-      }
-    }
-  } catch (e) {
-    console.log('⚠️  Enter-Taste fehlgeschlagen, suche Submit-Button...');
-  }
 
-  // Fallback: Suche Submit-Button
-  console.log('🔍 Durchsuche Seite nach sichtbaren Buttons...');
-  const allButtons = await page.locator('button').all();
-  console.log(`   Gefunden: ${allButtons.length} Buttons insgesamt`);
-  
-  const submitSelectors = [
-    'button:has-text("anmelden")',
-    'button:has-text("Anmelden")',
-    'button:has-text("weiter")',
-    'button:has-text("Weiter")',
-    'button[type="submit"]',
+  const otpInputSelectors = [
+    '.c24-uli-input-splitted',
+    'input[inputmode="numeric"]',
+    'input[type="tel"]',
+    'input[type="number"]',
+    'input[type="text"]',
   ];
 
-  let submitButton = null;
-  for (const selector of submitSelectors) {
-    const buttons = await page.locator(selector).all();
-    console.log(`   ${selector}: ${buttons.length} gefunden`);
-    for (const button of buttons) {
-      const visible = await button.isVisible().catch(() => false);
-      if (visible) {
-        const text = await button.textContent().catch(() => '');
-        submitButton = button;
-        console.log(`✅ Submit-Button gefunden: ${selector} (Text: "${text?.trim()}")`);
-        break;
+  // Bevorzugt: Enter direkt auf einem sichtbaren OTP-Feld.
+  for (const selector of otpInputSelectors) {
+    const inputs = await page.locator(selector).all();
+    for (const input of inputs) {
+      const isVisible = await input.isVisible().catch(() => false);
+      if (!isVisible) {
+        continue;
+      }
+
+      try {
+        await input.press('Enter');
+        console.log(`✅ Enter gedrückt im OTP-Feld (${selector})`);
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForTimeout(1000);
+        if (await hasReachedPostOtpState(page)) {
+          return;
+        }
+      } catch (error) {
+        console.log(`⚠️  Enter auf ${selector} fehlgeschlagen`);
       }
     }
-    if (submitButton) break;
   }
 
-  if (!submitButton) {
-    // Letzter Versuch: Liste alle sichtbaren Buttons
-    console.log('⚠️  Kein spezifischer Button gefunden. Alle sichtbaren Buttons:');
-    for (let i = 0; i < Math.min(allButtons.length, 10); i++) {
-      const btn = allButtons[i];
-      const visible = await btn.isVisible().catch(() => false);
-      if (visible) {
-        const text = await btn.textContent().catch(() => '');
-        const id = await btn.getAttribute('id').catch(() => '');
-        console.log(`   ${i+1}. id="${id}", text="${text?.trim()}"`);
-      }
+  // Fallback: Suche einen passenden Submit-Button auf dem OTP-Screen.
+  console.log('🔍 Suche Submit-Button...');
+  const submitButtonSelectors = [
+    '#c24-uli-lptan-btn',
+    'button[type="submit"]',
+    'button:has-text("Anmelden")',
+    'button:has-text("Bestätigen")',
+    'button:has-text("Weiter")',
+    '[role="button"]:has-text("Anmelden")',
+    '[role="button"]:has-text("Bestätigen")',
+    '[role="button"]:has-text("Weiter")',
+  ];
+
+  for (const selector of submitButtonSelectors) {
+    const button = page.locator(selector).first();
+    const exists = (await button.count()) > 0;
+
+    if (!exists) {
+      continue;
     }
-    throw new Error('Submit-Button nicht gefunden');
+
+    const isVisible = await button.isVisible().catch(() => false);
+    if (!isVisible) {
+      continue;
+    }
+
+    try {
+      const buttonText = (await button.textContent().catch(() => ''))?.trim() || selector;
+      await button.click({ force: true, timeout: 5000 });
+      console.log(`✅ Submit-Button geklickt: ${buttonText}`);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(1000);
+      if (await hasReachedPostOtpState(page)) {
+        return;
+      }
+    } catch (error) {
+      console.log(`⚠️  Submit-Button fehlgeschlagen: ${selector}`);
+    }
   }
 
-  await submitButton.click();
-  console.log('✅ Submit-Button geklickt');
-  await page.waitForLoadState('networkidle', { timeout: 30000 });
+  throw new Error('Kein passender OTP-Submit-Button gefunden');
+}
+
+async function isPhoneCollectorVisible(page: any) {
+  const laterButton = page.locator('a[data-tid="later-button"], [data-tid="later-button"]').first();
+  if (await laterButton.isVisible().catch(() => false)) {
+    return true;
+  }
+
+  const bodyText = (await page.locator('body').textContent().catch(() => '')) || '';
+  const bodyLower = bodyText.toLowerCase();
+  return bodyLower.includes('telefonnummer') ||
+    bodyLower.includes('handynummer') ||
+    bodyLower.includes('mobilnummer') ||
+    bodyLower.includes('später erinnern');
+}
+
+async function hasReachedPostOtpState(page: any) {
+  if (isKundenbereichUrl(page.url())) {
+    return true;
+  }
+
+  if (await isPhoneCollectorVisible(page)) {
+    console.log('✅ Phone-Collector nach OTP erkannt');
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Helper-Funktion: Wartet robust auf die Weiterleitung in den Kundenbereich
+ * und bricht explizit ab, falls der Redirect ausbleibt.
+ */
+function isKundenbereichUrl(urlValue: string) {
+  try {
+    const { hostname } = new URL(urlValue);
+    return hostname === 'kundenbereich.check24.de' || hostname === 'kundenbereich.check24-test.de';
+  } catch {
+    return false;
+  }
+}
+
+async function waitForKundenbereichRedirect(page: any, timeout: number = 15000) {
+  console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
+
+  await page.waitForLoadState('networkidle', { timeout }).catch(() => {
+    console.log('ℹ️  networkidle nicht erreicht - prüfe Redirect trotzdem weiter');
+  });
+
+  try {
+    await page.waitForURL((url: URL) => isKundenbereichUrl(url.toString()), { timeout });
+    console.log(`✅ Zum Kundenbereich weitergeleitet: ${page.url()}`);
+  } catch (error) {
+    const currentUrl = page.url();
+    const pageTitle = await page.title().catch(() => 'unbekannt');
+    throw new Error(
+      `Keine Weiterleitung zum Kundenbereich innerhalb von ${timeout}ms. Aktuelle URL: ${currentUrl}. Seitentitel: ${pageTitle}`
+    );
+  }
 }
 
 test.describe('CHECK24 Login - OTP Happy Path', () => {
@@ -251,8 +301,8 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
       // OTP-Login starten (E-Mail + "Mit Einmalcode anmelden")
       await startOtpLogin(page, credentials.email);
 
-    // "Code senden" klicken
-    await clickCodeSenden(page);
+    // "Code senden" klicken (EMAIL_ONLY hat keinen Selection Screen)
+    await clickCodeSenden(page, false);
 
     // OTP-Code aus E-Mail holen und eingeben
     await enterOtpCode(page);
@@ -263,49 +313,59 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
     // Warte auf mögliche Weiterleitung oder Phone Collector Screen
     await page.waitForTimeout(2000);
 
-    // Phone-Screen überspringen falls vorhanden (analog zu password-happy-path)
+    // Phone-Screen überspringen falls vorhanden (analog zu password-happy-path / auth.ts)
     console.log('🔍 Prüfe auf Phone-Screen (Phone Collector)...');
-    const bodyText = await page.locator('body').textContent() || '';
-    
-    if (bodyText.toLowerCase().includes('telefonnummer')) {
+    const hasPhoneCollector = await isPhoneCollectorVisible(page);
+
+    if (hasPhoneCollector) {
       console.log('📱 Phone-Screen erkannt - klicke "später erinnern"...');
-      
+      await page.waitForTimeout(500);
+
+      // Zuerst spezifische ID (Stelle 7), dann Fallbacks wie in password-happy-path/auth.ts
       const laterButtonSelectors = [
-        'button:has-text("später")',
+        'a[data-tid="later-button"]',
+        '[data-tid="later-button"]',
         'a:has-text("später")',
-        'button:has-text("Später")',
+        'button:has-text("später")',
         'a:has-text("Später")',
+        'button:has-text("Später")',
+        '[class*="later"]',
         '[class*="skip"]',
       ];
-      
+
       let laterClicked = false;
       for (const selector of laterButtonSelectors) {
         try {
           const button = page.locator(selector).first();
-          if (await button.count() > 0) {
+          if ((await button.count()) === 0) continue;
+          // Bei data-tid nicht nach Text filtern; bei Klassen/Text-Selektoren nur Elemente mit passendem Text
+          if (!selector.includes('data-tid')) {
+            const text = await button.textContent().catch(() => '') || '';
+            if (text && !/später|skip|erinnern/i.test(text)) continue;
+          }
+          console.log(`🔍 "später erinnern" gefunden mit: ${selector}`);
+          try {
+            await button.waitFor({ state: 'attached', timeout: 3000 });
             await button.click({ force: true, timeout: 3000 });
-            console.log(`✅ "später erinnern" geklickt (${selector})`);
+            console.log('✅ "später erinnern" geklickt');
             laterClicked = true;
             await page.waitForTimeout(2000);
             break;
-          }
-        } catch (e) {
-          // Versuche JavaScript
-          try {
-            const button = page.locator(selector).first();
-            if (await button.count() > 0) {
+          } catch (e) {
+            try {
               await button.evaluate((btn: any) => btn.click());
-              console.log(`✅ "später erinnern" geklickt via JavaScript (${selector})`);
+              console.log('✅ "später erinnern" geklickt via JavaScript');
               laterClicked = true;
               await page.waitForTimeout(2000);
               break;
+            } catch (jsErr) {
+              continue;
             }
-          } catch (jsErr) {
-            continue;
           }
+        } catch (e) {
+          continue;
         }
       }
-      
       if (!laterClicked) {
         console.log('⚠️  "später erinnern" Button nicht gefunden - fahre trotzdem fort');
       }
@@ -313,16 +373,7 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
       console.log('ℹ️  Kein Phone-Screen erkannt');
     }
 
-    // Warte auf Weiterleitung zum Kundenbereich
-    console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
-    
-    try {
-      await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 3000 });
-      console.log('✅ Zum Kundenbereich weitergeleitet');
-    } catch (e) {
-      console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-      await page.waitForTimeout(1000);
-    }
+      await waitForKundenbereichRedirect(page);
 
       // Login-Erfolg verifizieren (c24session Cookie prüfen)
       await expectLoginSuccess(page);
@@ -389,8 +440,8 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
         console.log('ℹ️  Kein OTP Selection Screen erkannt - überspringe Auswahl');
       }
 
-      // "Code senden" klicken
-      await clickCodeSenden(page);
+      // "Code senden" klicken (Combined Account hat Selection Screen)
+      await clickCodeSenden(page, true);
 
       // OTP-Code aus E-Mail holen und eingeben
       const otpCode = await enterOtpCode(page);
@@ -399,16 +450,7 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
       console.log('⏳ Warte auf Auto-Submit und Navigation...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
       
-      // Warte auf Weiterleitung zum Kundenbereich
-      console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
-      
-      try {
-        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
-        console.log('✅ Zum Kundenbereich weitergeleitet');
-      } catch (e) {
-        console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(1000);
-      }
+      await waitForKundenbereichRedirect(page);
 
       // Login-Erfolg verifizieren (Combined Account hat keinen Phone Collector)
       await expectLoginSuccess(page);
@@ -472,8 +514,8 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
         console.log('⚠️  Kein OTP Selection Screen erkannt - überspringe Auswahl');
       }
 
-      // "Code senden" klicken - SMS wird versendet
-      await clickCodeSenden(page);
+      // "Code senden" klicken - SMS wird versendet (Combined Account hat Selection Screen)
+      await clickCodeSenden(page, true);
 
       // SMS-Code aus weitergeleiteter E-Mail holen (iPhone-Weiterleitung)
       console.log('📱 Warte auf weitergeleitete SMS per E-Mail vom iPhone...');
@@ -508,44 +550,21 @@ test.describe('CHECK24 Login - OTP Happy Path', () => {
 
       console.log(`🔑 SMS-Code erhalten: ${smsCode}`);
 
-      // SMS-Code eingeben - verwende die gleiche Logik wie enterOtpCode
+      // SMS-Code eingeben
       console.log('🔍 Suche SMS-Eingabefeld...');
       
-      let smsInput = null;
-      const smsInputs = await page.locator('input[type="tel"], input[type="text"], input[id*="tan"]').all();
-      for (const input of smsInputs) {
-        const isVisible = await input.isVisible().catch(() => false);
-        if (isVisible) {
-          smsInput = input;
-          console.log('✅ SMS-Eingabefeld gefunden');
-          break;
-        }
-      }
-
-      if (!smsInput) {
-        throw new Error('SMS-Eingabefeld nicht gefunden');
-      }
+      const smsInput = page.locator('.c24-uli-input-splitted').first();
+      await smsInput.waitFor({ state: 'attached', timeout: 10000 });
+      console.log('✅ SMS-Eingabefeld gefunden');
 
       await page.waitForTimeout(500);
-      await smsInput.fill(smsCode);
+      await smsInput.fill(smsCode, { force: true });
       console.log('✅ SMS-Code eingegeben');
       
-      // Auto-Submit: Nach SMS-Code-Eingabe erfolgt automatische Weiterleitung
-      console.log('⏳ Warte auf Auto-Submit und Navigation...');
-      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      // Submit OTP Login (Enter drücken oder Button klicken)
+      await submitOtpLogin(page);
       
-      // Warte auf Weiterleitung zum Kundenbereich
-      console.log('⏳ Warte auf Weiterleitung zum Kundenbereich...');
-      
-      // Warte explizit auf kundenbereich URL
-      try {
-        await page.waitForURL(/kundenbereich\.check24(-test)?\.de/, { timeout: 5000 });
-        console.log('✅ Zum Kundenbereich weitergeleitet');
-      } catch (e) {
-        console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(1000);
-      }
-      
+      await waitForKundenbereichRedirect(page);
       console.log(`📍 Finale URL nach SMS-Login: ${page.url()}`);
       console.log(`📄 Seitentitel: ${await page.title()}`);
 
