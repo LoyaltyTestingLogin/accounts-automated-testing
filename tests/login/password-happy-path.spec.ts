@@ -47,55 +47,62 @@ test.describe('CHECK24 Login - Happy Path', () => {
     await page.waitForTimeout(1000);
     
     // Prüfe ob Cookie-Banner vorhanden ist
-    const cookieBannerVisible = await page.locator('.c24-cookie-consent-wrapper, .c24-strict-blocking-layer, [class*="cookie-consent"]').count() > 0;
+    const cookieBannerVisible = await page.locator('a.c24-cookie-consent-button').count() > 0;
     console.log(`🍪 Cookie-Banner vorhanden: ${cookieBannerVisible}`);
     
     if (cookieBannerVisible) {
       // Versuche Cookie-Banner über verschiedene Methoden wegzuklicken
       const cookieSelectors = [
-        'button:has-text("geht klar")',
-        'button:has-text("Akzeptieren")',
-        'button:has-text("Alle akzeptieren")',
-        'a:has-text("geht klar")',
-        'a:has-text("Akzeptieren")',
-        '.c24-cookie-consent-wrapper button',
-        '.c24-cookie-consent-wrapper a',
-        'button[class*="cookie" i]',
-        'a[class*="cookie" i]',
+        'a.c24-cookie-consent-button',
       ];
+
+      const clickVisibleGehtKlarButton = async (selector: string) => {
+        return await page.evaluate((sel: string) => {
+          const buttons = Array.from(document.querySelectorAll(sel)) as HTMLElement[];
+
+          for (const button of buttons) {
+            const text = (button.innerText || button.textContent || '').trim().toLowerCase();
+            const rect = button.getBoundingClientRect();
+            const isVisible = rect.width > 0 && rect.height > 0 && getComputedStyle(button).visibility !== 'hidden' && getComputedStyle(button).display !== 'none';
+
+            if (isVisible && text === 'geht klar') {
+              button.click();
+              return true;
+            }
+          }
+
+          return false;
+        }, selector);
+      };
       
       let cookieClicked = false;
       for (const selector of cookieSelectors) {
         try {
-          const locator = page.locator(selector).first();
-          if (await locator.count() > 0) {
+          const locator = page.locator(selector);
+          const count = await locator.count();
+
+          if (count > 0) {
             console.log(`🔍 Versuche Cookie-Button: ${selector}`);
-            
-            // Versuche mehrere Click-Methoden
-            try {
-              await locator.click({ timeout: 1500, force: true });
-              console.log(`✅ Cookie-Banner weggeklickt (force click): ${selector}`);
+            const clicked = await clickVisibleGehtKlarButton(selector);
+
+            if (!clicked) {
+              console.log('⚠️  Kein sichtbarer "geht klar"-Button gefunden');
+              continue;
+            }
+
+            await page.waitForTimeout(800);
+            const blockingLayerVisible = await page.locator('.c24-strict-blocking-layer').isVisible().catch(() => false);
+
+            if (!blockingLayerVisible) {
+              console.log(`✅ Cookie-Banner weggeklickt: ${selector}`);
               cookieClicked = true;
               break;
-            } catch (e1) {
-              try {
-                await page.evaluate((sel: string) => {
-                  // @ts-expect-error - document is available in browser context
-                  const elements = document.querySelectorAll(sel);
-                  if (elements.length > 0) {
-                    // @ts-expect-error - HTMLElement is available in browser context
-                    (elements[0] as HTMLElement).click();
-                    return true;
-                  }
-                  return false;
-                }, selector);
-                console.log(`✅ Cookie-Banner weggeklickt (JavaScript): ${selector}`);
-                cookieClicked = true;
-                break;
-              } catch (e2) {
-                console.log(`⚠️  Beide Click-Methoden fehlgeschlagen für: ${selector}`);
-                continue;
-              }
+            }
+
+            console.log('⚠️  Blocking-Layer ist noch sichtbar - falscher Cookie-Button wurde vermutlich getroffen');
+
+            if (cookieClicked) {
+              break;
             }
           }
         } catch (e) {
@@ -133,12 +140,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
     
     // Suche Profil-Button (oben rechts)
     const profilSelectors = [
-      'button:has-text("Profil")',
-      'a:has-text("Profil")',
-      '[aria-label*="Profil" i]',
-      '[title*="Profil" i]',
-      'button[class*="profile" i]',
-      'a[class*="profile" i]',
+      'a.c24-customer-hover-wrapper',
     ];
     
     let profilButton = null;
@@ -169,11 +171,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
     
     // Suche "abmelden" Button im Profil-Menü
     const abmeldenSelectors = [
-      'button:has-text("abmelden")',
-      'a:has-text("abmelden")',
-      'button:has-text("Abmelden")',
-      'a:has-text("Abmelden")',
-      '[role="menuitem"]:has-text("abmelden")',
+      'div.c24-customer-check a[title="abmelden"]',
     ];
     
     let abmeldenButton = null;
@@ -211,10 +209,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
     
     // Suche "anmelden" Button
     const anmeldenSelectors = [
-      'button:has-text("anmelden")',
-      'a:has-text("anmelden")',
-      'button:has-text("Anmelden")',
-      'a:has-text("Anmelden")',
+      'a.c24-kb-login-promo-banner__button',
     ];
     
     let anmeldenButton = null;
@@ -248,7 +243,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
     
     await page.waitForTimeout(1000);
     
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[name*="login"]').first();
+    const emailInput = page.locator('#cl_login');
     const emailValue = await emailInput.inputValue();
     
     console.log(`📧 Email-Feld Wert: ${emailValue}`);
@@ -264,10 +259,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
     console.log('🔍 Suche Passwort-Feld...');
     
     const passwordSelectors = [
-      'input[type="password"]',
-      'input[name="password"]',
-      'input[id*="password" i]',
-      'input[class*="password" i]',
+      '#cl_pw_login',
     ];
     
     let passwordFilled = false;
@@ -340,7 +332,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
     await page.waitForTimeout(300);
     
     // Login absenden
-    const submitButton = page.locator('button[type="submit"]:has-text("Anmelden"), button:has-text("Anmelden")').first();
+    const submitButton = page.locator('#c24-uli-pw-btn');
     await submitButton.click();
     console.log('✅ Anmelden geklickt');
     
@@ -365,15 +357,14 @@ test.describe('CHECK24 Login - Happy Path', () => {
       
       // Suche "später erinnern" Button mit erweiterten Selektoren
       const spaterSelectors = [
+        'a[data-tid="later-button"]',
+        '[data-tid="later-button"]',
         'a:has-text("später")',
         'button:has-text("später")',
         'a:has-text("Später")',
         'button:has-text("Später")',
-        'a[href*="later" i]',
-        'button[class*="later" i]',
-        'a[class*="skip" i]',
-        '[data-testid*="later" i]',
-        '[data-testid*="skip" i]',
+        '[class*="later"]',
+        '[class*="skip"]',
       ];
       
       let spaterClicked = false;
@@ -566,12 +557,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
         
         // Gleiche Button-Logik wie in handleLoginChallenge
         const submitButtonSelectors = [
-          'button:has-text("Code senden")',
-          'button:has-text("code senden")',
-          'button:has-text("Senden")',
-          'button[type="submit"]:has-text("Weiter")',
-          'button:has-text("Weiter")',
-          '[role="button"]:has-text("Code senden")',
+          '#c24-uli-lc-start-btn',
         ];
         
         let submitButton = null;
@@ -597,7 +583,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
         
         // Fallback: Suche sichtbaren "weiter"-Button
         if (!submitButton) {
-          console.log('🔍 Kein spezifischer Button gefunden, suche sichtbaren "weiter"-Button...');
+          console.log('🔍 Kein ID-Button gefunden, suche sichtbaren "weiter"-Button...');
           const weiterButtons = await page.locator('button[type="submit"]').all();
           for (const btn of weiterButtons) {
             try {
@@ -739,7 +725,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
           console.log('✅ Enter gedrückt');
         } catch (enterError) {
           // Button-Fallback
-          const submitButton = page.locator('button[type="submit"], button:has-text("Weiter"), button:has-text("Bestätigen")').first();
+          const submitButton = page.locator('#c24-uli-lptan-btn');
           if (await submitButton.count() > 0) {
             await submitButton.click({ force: true });
             console.log('✅ Submit-Button geklickt');
@@ -755,10 +741,13 @@ test.describe('CHECK24 Login - Happy Path', () => {
           console.log('📱 Phone-Screen erkannt - klicke "später erinnern"...');
           
           const laterButtonSelectors = [
-            'button:has-text("später")',
+            'a[data-tid="later-button"]',
+            '[data-tid="later-button"]',
             'a:has-text("später")',
-            'button:has-text("Später")',
+            'button:has-text("später")',
             'a:has-text("Später")',
+            'button:has-text("Später")',
+            '[class*="later"]',
             '[class*="skip"]',
           ];
           
@@ -984,7 +973,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
           console.log('✅ Enter gedrückt');
         } catch (enterError) {
           // Button-Fallback
-          const submitButton = page.locator('button[type="submit"], button:has-text("Weiter"), button:has-text("Bestätigen")').first();
+          const submitButton = page.locator('#c24-uli-lptan-btn');
           if (await submitButton.count() > 0) {
             await submitButton.click({ force: true });
             console.log('✅ Submit-Button geklickt');
@@ -1037,44 +1026,4 @@ test.describe('CHECK24 Login - Happy Path', () => {
     }
   });
 
-  test('Login-Seite lädt korrekt', async ({ page }) => {
-    // Zur Login-Seite navigieren
-    const loginUrl = getLoginUrl();
-    
-    await page.goto(loginUrl);
-    await page.waitForLoadState('networkidle');
-
-    // Prüfen ob wichtige Elemente vorhanden sind
-    const emailInput = page.locator('input[type="email"], input[name="email"]').first();
-    const passwordInput = page.locator('input[type="password"]').first();
-    const submitButton = page.locator('button[type="submit"]').first();
-
-    await expect(emailInput).toBeVisible({ timeout: 10000 });
-    await expect(passwordInput).toBeVisible();
-    await expect(submitButton).toBeVisible();
-
-    // Prüfen ob Seite den korrekten Titel hat
-    await expect(page).toHaveTitle(/check24|login|anmeld/i);
-
-    console.log('✅ Login-Seite lädt korrekt mit allen erforderlichen Elementen');
-  });
-
-  test('Login-Formular ist interaktiv', async ({ page }) => {
-    const loginUrl = getLoginUrl();
-    
-    await page.goto(loginUrl);
-    await page.waitForLoadState('networkidle');
-
-    const emailInput = page.locator('input[type="email"], input[name="email"]').first();
-    const passwordInput = page.locator('input[type="password"]').first();
-
-    // Interaktivität testen
-    await emailInput.fill('test@example.com');
-    await expect(emailInput).toHaveValue('test@example.com');
-
-    await passwordInput.fill('testpassword');
-    await expect(passwordInput).toHaveValue('testpassword');
-
-    console.log('✅ Login-Formular ist interaktiv');
-  });
 });

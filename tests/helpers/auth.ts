@@ -30,7 +30,7 @@ export async function loginWithPassword(page: Page, email: string, password: str
   await takeAutoScreenshot(page, 'login-screen-empty');
 
   // SCHRITT 1: E-Mail/Benutzername eingeben
-  const emailInput = page.locator('input[type="email"], input[name="email"], input[name="username"], input[id*="email"], input[placeholder*="E-Mail"]').first();
+  const emailInput = page.locator('#cl_login');
   await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   
   console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
@@ -41,7 +41,7 @@ export async function loginWithPassword(page: Page, email: string, password: str
   await takeAutoScreenshot(page, 'email-entered');
 
   // Klick auf "Weiter"-Button
-  const weiterButton = page.locator('button[type="submit"]').first();
+  const weiterButton = page.locator('#c24-uli-login-btn');
   
   console.log('➡️  Klicke auf "Weiter"-Button...');
   await page.waitForTimeout(200);
@@ -51,7 +51,7 @@ export async function loginWithPassword(page: Page, email: string, password: str
 
   // SCHRITT 2: Passwort eingeben (erscheint erst nach "Weiter"-Klick)
   console.log('🔍 Warte auf Passwort-Feld...');
-  const passwordInput = page.locator('input[type="password"], input[name="password"], input[id*="password"]').first();
+  const passwordInput = page.locator('#cl_pw_login');
   
   // Warten bis Passwort-Feld verfügbar ist
   await passwordInput.waitFor({ state: 'attached', timeout: 10000 });
@@ -566,17 +566,27 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
   // Cookie-Banner schließen falls vorhanden
   console.log('🍪 Prüfe auf Cookie-Banner...');
   const cookieButtonSelectors = [
-    'button:has-text("Nur notwendige")',
-    'button:has-text("nur notwendige")',
-    'button:has-text("Notwendige")',
-    'button:has-text("Ablehnen")',
-    'button:has-text("ablehnen")',
-    '[data-testid="uc-deny-all-button"]',
-    '#usercentrics-root button',
-    'button[class*="cookie"]',
-    'button[id*="cookie"]',
-    'a:has-text("Nur notwendige")',
+    'a.c24-cookie-consent-button',
   ];
+
+  async function clickVisibleGehtKlarButton(selector: string) {
+    return await page.evaluate((sel: string) => {
+      const buttons = Array.from(document.querySelectorAll(sel)) as HTMLElement[];
+
+      for (const button of buttons) {
+        const text = (button.innerText || button.textContent || '').trim().toLowerCase();
+        const rect = button.getBoundingClientRect();
+        const isVisible = rect.width > 0 && rect.height > 0 && getComputedStyle(button).visibility !== 'hidden' && getComputedStyle(button).display !== 'none';
+
+        if (isVisible && text === 'geht klar') {
+          button.click();
+          return true;
+        }
+      }
+
+      return false;
+    }, selector);
+  }
 
   let cookieBannerClosed = false;
   for (const selector of cookieButtonSelectors) {
@@ -586,14 +596,26 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
       
       if (count > 0) {
         console.log(`🔍 Cookie-Button gefunden: ${selector} (${count} Element(e))`);
-        try {
-          await cookieButton.first().click({ force: true, timeout: 3000 });
-          await page.waitForTimeout(800);
+        const clicked = await clickVisibleGehtKlarButton(selector);
+
+        if (!clicked) {
+          console.log('⚠️  Kein sichtbarer "geht klar"-Button gefunden');
+          continue;
+        }
+
+        await page.waitForTimeout(800);
+
+        const blockingLayerVisible = await page.locator('.c24-strict-blocking-layer').isVisible().catch(() => false);
+        if (!blockingLayerVisible) {
           console.log(`✅ Cookie-Banner geschlossen via: ${selector}`);
           cookieBannerClosed = true;
           break;
-        } catch (clickError) {
-          console.log(`⚠️  Klick fehlgeschlagen auf: ${selector}`);
+        }
+
+        console.log('⚠️  Blocking-Layer ist noch sichtbar - falscher Cookie-Button wurde vermutlich getroffen');
+
+        if (cookieBannerClosed) {
+          break;
         }
       }
     } catch (e) {
