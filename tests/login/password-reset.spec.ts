@@ -33,62 +33,35 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
       const emailInput = page.locator('#cl_login');
       await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
       await emailInput.fill(credentials.email);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       await takeAutoScreenshot(page, 'email-entered');
 
       // "Weiter" klicken
       console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      const weiterButton = page.locator('#c24-uli-login-btn');
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(150);
 
       // SCHRITT 2: "Passwort vergessen?" klicken
-      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
-      
-      // Warte bis Passwort-Screen sichtbar ist
-      await page.waitForTimeout(1000);
-      
-      const forgotPasswordSelectors = [
-        'a:has-text("Passwort vergessen?")',
-        'button:has-text("Passwort vergessen?")',
-        '[href*="password-reset"]',
-        '[href*="forgot"]',
-        'a:has-text("vergessen")',
-      ];
+      console.log('🔑 SCHRITT 2: Klicke "Passwort vergessen?"...');
+      await page.waitForTimeout(400);
+      const forgotPasswordWrapper = page.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await forgotPasswordWrapper.waitFor({ state: 'visible', timeout: 10000 });
+      await forgotPasswordWrapper.click();
+      console.log('✅ "Passwort vergessen?" geklickt');
+      await page.waitForTimeout(600);
 
-      let forgotPasswordClicked = false;
-      for (const selector of forgotPasswordSelectors) {
-        try {
-          const element = page.locator(selector).first();
-          if (await element.count() > 0 && await element.isVisible()) {
-            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
-            await element.click();
-            console.log('✅ "Passwort vergessen?" geklickt');
-            forgotPasswordClicked = true;
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!forgotPasswordClicked) {
-        throw new Error('Konnte "Passwort vergessen?" Button/Link nicht finden');
-      }
-
-      await page.waitForTimeout(1500);
-
-      // SCHRITT 3: "Code senden" klicken (Email-Only Account)
+      // SCHRITT 3: "Code senden" klicken (Email-Only Account – kein Selection Screen, andere Button-ID)
       console.log('📧 SCHRITT 3: Klicke "Code senden"...');
-      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
-      await codeSendenButton.first().waitFor({ state: 'visible', timeout: 10000 });
-      await codeSendenButton.first().click();
+      const codeSendenButton = page.locator('#c24-uli-pwr-email-btn');
+      await codeSendenButton.waitFor({ state: 'visible', timeout: 10000 });
+      await codeSendenButton.click();
       console.log('✅ "Code senden" wurde geklickt');
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // E-Mail Client initialisieren (wird für mehrere Schritte benötigt)
       const emailClient = getEmailClient();
@@ -175,27 +148,24 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       }
 
       // TAN-Code komplett eingeben (6-stellig)
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await tanInput.fill(tanCode);
       console.log('✅ TAN-Code eingegeben (6-stellig komplett)');
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(600);
 
       // SCHRITT 6: Warte auf Navigation / Screen-Update
       console.log('⏳ SCHRITT 6: Warte auf Screen-Update...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
       // SCHRITT 7: "Passwort ändern" Link klicken
-      console.log('🔐 SCHRITT 7: Suche "Passwort ändern" Link...');
-      
-      const passwortAendernLink = page.locator('a:has-text("Passwort ändern")').first();
+      console.log('🔐 SCHRITT 7: Klicke "Passwort ändern"...');
+      const passwortAendernLink = page.locator('a.c24-uli-pwr-pw-link').first();
       await passwortAendernLink.waitFor({ state: 'visible', timeout: 10000 });
-      console.log('✅ "Passwort ändern" Link gefunden');
-      
       await passwortAendernLink.click();
       console.log('✅ "Passwort ändern" geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 8: Neues Passwort eingeben
       console.log('🔐 SCHRITT 8: Gebe neues Passwort ein...');
@@ -223,43 +193,20 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // Erstes Passwort-Feld
       await visiblePasswordFields[0].fill(newPassword);
       console.log('✅ Passwort in erstes Feld eingegeben');
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
 
       // Zweites Passwort-Feld (Bestätigung)
       await visiblePasswordFields[1].fill(newPassword);
       console.log('✅ Passwort in zweites Feld eingegeben (Bestätigung)');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
 
       // SCHRITT 9: "Speichern und weiter" klicken
       console.log('💾 SCHRITT 9: Klicke "Speichern und weiter"...');
-      
-      const speichernSelectors = [
-        'button:has-text("Speichern und weiter")',
-        'button:has-text("speichern")',
-        'button[type="submit"]',
-      ];
-
-      let speichernClicked = false;
-      for (const selector of speichernSelectors) {
-        try {
-          const element = page.locator(selector).first();
-          if (await element.count() > 0 && await element.isVisible()) {
-            console.log(`✅ "Speichern und weiter" gefunden mit: ${selector}`);
-            await element.click();
-            console.log('✅ "Speichern und weiter" geklickt');
-            speichernClicked = true;
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!speichernClicked) {
-        throw new Error('Konnte "Speichern und weiter" Button nicht finden');
-      }
-
-      await page.waitForTimeout(2000);
+      const speichernButton = page.locator('#c24-uli-pwr-pw-btn');
+      await speichernButton.waitFor({ state: 'visible', timeout: 10000 });
+      await speichernButton.click();
+      console.log('✅ "Speichern und weiter" geklickt');
+      await page.waitForTimeout(150);
 
       // SCHRITT 10: Prüfe auf Bestätigungsmail für Passwort-Änderung
       console.log('📧 SCHRITT 10: Prüfe auf Bestätigungsmail für Passwort-Änderung...');
@@ -285,80 +232,68 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 11: Phone Collector überspringen (nur bei Email-Only Account)
       console.log('🔍 SCHRITT 11: Prüfe auf Phone-Screen (Phone Collector)...');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
       
       const bodyText = await page.locator('body').textContent() || '';
       const hasPhoneCollector = bodyText.toLowerCase().includes('telefonnummer');
 
       if (hasPhoneCollector) {
         console.log('📱 Phone-Screen erkannt - klicke "später erinnern"...');
-        
-        const skipSelectors = [
-          'a:has-text("später erinnern")',
+        await page.waitForTimeout(200);
+
+        // Wie in otp-happy-path: data-tid zuerst, dann Fallbacks (bis zu 2 Klicks für Overlay + Screen)
+        const laterButtonSelectors = [
+          'a[data-tid="later-button"]',
+          '[data-tid="later-button"]',
+          'a:has-text("später")',
           'button:has-text("später")',
+          'a:has-text("Später")',
+          'button:has-text("Später")',
+          '[class*="later"]',
           '[class*="skip"]',
         ];
 
-        // Es gibt ZWEI "später erinnern" Links, die beide geklickt werden müssen
-        // 1. Klick: Schließt ein Overlay/Popup
-        // 2. Klick: Überspringt den Phone Collector Screen selbst
         let clickCount = 0;
-        
         for (let attempt = 0; attempt < 2; attempt++) {
-          let clicked = false;
-          
-          // Suche alle "später erinnern" Elemente und klicke das erste sichtbare
-          for (const selector of skipSelectors) {
+          let laterClicked = false;
+          for (const selector of laterButtonSelectors) {
             try {
-              const elements = await page.locator(selector).all();
-              
-              for (const element of elements) {
-                const isVisible = await element.isVisible().catch(() => false);
-                const text = await element.textContent().catch(() => '');
-                
-                if (isVisible && text?.toLowerCase().includes('später')) {
-                  console.log(`   Klicke "später erinnern" Link ${clickCount + 1}...`);
-                  
-                  try {
-                    await element.click({ timeout: 2000 });
-                    console.log(`✅ "später erinnern" geklickt (Click ${clickCount + 1})`);
-                    clicked = true;
-                    clickCount++;
-                    await page.waitForTimeout(1000);
-                    break;
-                  } catch (e) {
-                    try {
-                      await element.click({ force: true, timeout: 2000 });
-                      console.log(`✅ "später erinnern" geklickt via force (Click ${clickCount + 1})`);
-                      clicked = true;
-                      clickCount++;
-                      await page.waitForTimeout(1000);
-                      break;
-                    } catch (e2) {
-                      continue;
-                    }
-                  }
-                }
+              const button = page.locator(selector).first();
+              if ((await button.count()) === 0) continue;
+              if (!selector.includes('data-tid')) {
+                const text = await button.textContent().catch(() => '') || '';
+                if (text && !/später|skip|erinnern/i.test(text)) continue;
               }
-              
-              if (clicked) break;
+              console.log(`   Klicke "später erinnern" (Versuch ${attempt + 1}) mit: ${selector}`);
+              await button.waitFor({ state: 'attached', timeout: 3000 });
+              await button.click({ force: true, timeout: 3000 });
+              console.log('✅ "später erinnern" geklickt');
+              laterClicked = true;
+              clickCount++;
+              await page.waitForTimeout(150);
+              break;
             } catch (e) {
-              continue;
+              try {
+                const button = page.locator(selector).first();
+                if ((await button.count()) === 0) continue;
+                await button.evaluate((btn: unknown) => (btn as { click(): void }).click());
+                console.log('✅ "später erinnern" geklickt via JavaScript');
+                laterClicked = true;
+                clickCount++;
+                await page.waitForTimeout(150);
+                break;
+              } catch (jsErr) {
+                continue;
+              }
             }
           }
-          
-          if (!clicked) {
-            console.log(`   Kein weiterer "später erinnern" Link gefunden (${clickCount} Clicks gesamt)`);
-            break;
-          }
+          if (!laterClicked) break;
         }
 
         if (clickCount === 0) {
           console.warn('⚠️  Konnte Phone Collector nicht überspringen, fahre trotzdem fort...');
-        } else if (clickCount === 1) {
-          console.log(`✅ Phone Collector teilweise übersprungen (${clickCount} Click) - prüfe Weiterleitung...`);
         } else {
-          console.log(`✅ Phone Collector vollständig übersprungen (${clickCount} Clicks)`);
+          console.log(`✅ Phone Collector übersprungen (${clickCount} Klick(s))`);
         }
 
         // Warte auf Navigation zum Kundenbereich (erfolgt automatisch nach "später erinnern")
@@ -366,7 +301,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         
         // Warte auf networkidle (alle Netzwerkaktivitäten abgeschlossen)
         await page.waitForLoadState('networkidle', { timeout: 30000 });
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(150);
         
         // Prüfe finale URL
         const finalUrl = page.url();
@@ -376,7 +311,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           console.log('✅ Zum Kundenbereich weitergeleitet');
         } else {
           console.log('⚠️  Noch nicht auf Kundenbereich - URL wird möglicherweise noch aktualisiert');
-          await page.waitForTimeout(3000);
+          await page.waitForTimeout(1200);
           console.log(`📍 URL nach zusätzlichem Warten: ${page.url()}`);
         }
       } else {
@@ -417,53 +352,29 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
       const emailInput = page.locator('#cl_login');
       await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
       await emailInput.fill(credentials.email);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       // "Weiter" klicken
       console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      const weiterButton = page.locator('#c24-uli-login-btn');
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 2: "Passwort vergessen?" klicken
-      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
-      
-      const forgotPasswordSelectors = [
-        'a:has-text("Passwort vergessen?")',
-        'button:has-text("Passwort vergessen?")',
-        '[data-tid*="forgot"]',
-        'a:has-text("Passwort")',
-      ];
-
-      let forgotPasswordLink = null;
-      for (const selector of forgotPasswordSelectors) {
-        const element = page.locator(selector).first();
-        if (await element.count() > 0) {
-          const isVisible = await element.isVisible().catch(() => false);
-          if (isVisible) {
-            forgotPasswordLink = element;
-            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
-            break;
-          }
-        }
-      }
-
-      if (!forgotPasswordLink) {
-        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
-      }
-
-      await forgotPasswordLink.click();
+      console.log('🔑 SCHRITT 2: Klicke "Passwort vergessen?"...');
+      const forgotPasswordWrapper = page.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await forgotPasswordWrapper.waitFor({ state: 'visible', timeout: 10000 });
+      await forgotPasswordWrapper.click();
       console.log('✅ "Passwort vergessen?" geklickt');
-
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 3: Selection Screen - E-Mail auswählen
       console.log('🔍 SCHRITT 3: Prüfe auf Selection Screen...');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       const emailRadio = page.locator('#c24-uli-choose-email');
       const hasEmailOption = await emailRadio.count() > 0;
@@ -487,7 +398,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           }
         }
         
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(150);
         
         // Verifiziere dass E-Mail ausgewählt ist
         const isChecked = await emailRadio.isChecked().catch(() => false);
@@ -498,11 +409,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 4: "Code senden" klicken
       console.log('📧 SCHRITT 4: Klicke "Code senden"...');
-      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
+      const codeSendenButton = page.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenButton.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenButton.click();
       console.log('✅ "Code senden" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // E-Mail Client initialisieren (wird für mehrere Schritte benötigt)
       const emailClient = getEmailClient();
@@ -575,28 +487,23 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         throw new Error('Konnte TAN-Eingabefeld nicht finden');
       }
 
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await tanInput.fill(tanCode);
       console.log('✅ TAN-Code eingegeben (6-stellig komplett)');
 
       // SCHRITT 7: Warte auf Auto-Submit
       console.log('⏳ SCHRITT 7: Warte auf Screen-Update...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 8: "Passwort ändern" klicken
-      console.log('🔐 SCHRITT 8: Suche "Passwort ändern" Link...');
-      const passwordChangeLink = page.locator('a:has-text("Passwort ändern")').first();
-      
-      if (await passwordChangeLink.count() === 0) {
-        throw new Error('Konnte "Passwort ändern" Link nicht finden');
-      }
-
-      console.log('✅ "Passwort ändern" Link gefunden');
+      console.log('🔐 SCHRITT 8: Klicke "Passwort ändern"...');
+      const passwordChangeLink = page.locator('a.c24-uli-pwr-pw-link').first();
+      await passwordChangeLink.waitFor({ state: 'visible', timeout: 10000 });
       await passwordChangeLink.click();
       console.log('✅ "Passwort ändern" geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 9: Neues Passwort eingeben
       console.log('🔐 SCHRITT 9: Gebe neues Passwort ein...');
@@ -626,34 +533,11 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 10: "Speichern und weiter" klicken
       console.log('💾 SCHRITT 10: Klicke "Speichern und weiter"...');
-      
-      const saveButtonSelectors = [
-        'button:has-text("Speichern und weiter")',
-        'button:has-text("Speichern")',
-        '[type="submit"]:has-text("Speichern")',
-      ];
-
-      let saveButton = null;
-      for (const selector of saveButtonSelectors) {
-        const button = page.locator(selector).first();
-        if (await button.count() > 0) {
-          const isVisible = await button.isVisible().catch(() => false);
-          if (isVisible) {
-            saveButton = button;
-            console.log(`✅ "Speichern und weiter" gefunden mit: ${selector}`);
-            break;
-          }
-        }
-      }
-
-      if (!saveButton) {
-        throw new Error('Konnte "Speichern und weiter" Button nicht finden');
-      }
-
+      const saveButton = page.locator('#c24-uli-pwr-pw-btn');
+      await saveButton.waitFor({ state: 'visible', timeout: 10000 });
       await saveButton.click();
       console.log('✅ "Speichern und weiter" geklickt');
-
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 11: Prüfe auf Bestätigungsmail für Passwort-Änderung
       console.log('📧 SCHRITT 11: Prüfe auf Bestätigungsmail für Passwort-Änderung...');
@@ -686,7 +570,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(150);
       }
 
       // SCHRITT 13: Login-Erfolg verifizieren
@@ -721,53 +605,29 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
       const emailInput = page.locator('#cl_login');
       await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
       await emailInput.fill(credentials.email);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       // "Weiter" klicken
       console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      const weiterButton = page.locator('#c24-uli-login-btn');
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 2: "Passwort vergessen?" klicken
-      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
-      
-      const forgotPasswordSelectors = [
-        'a:has-text("Passwort vergessen?")',
-        'button:has-text("Passwort vergessen?")',
-        '[data-tid*="forgot"]',
-        'a:has-text("Passwort")',
-      ];
-
-      let forgotPasswordLink = null;
-      for (const selector of forgotPasswordSelectors) {
-        const element = page.locator(selector).first();
-        if (await element.count() > 0) {
-          const isVisible = await element.isVisible().catch(() => false);
-          if (isVisible) {
-            forgotPasswordLink = element;
-            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
-            break;
-          }
-        }
-      }
-
-      if (!forgotPasswordLink) {
-        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
-      }
-
-      await forgotPasswordLink.click();
+      console.log('🔑 SCHRITT 2: Klicke "Passwort vergessen?"...');
+      const forgotPasswordWrapper = page.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await forgotPasswordWrapper.waitFor({ state: 'visible', timeout: 10000 });
+      await forgotPasswordWrapper.click();
       console.log('✅ "Passwort vergessen?" geklickt');
-
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 3: Selection Screen - SMS auswählen
       console.log('🔍 SCHRITT 3: Prüfe auf Selection Screen...');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       const smsRadio = page.locator('#c24-uli-choose-sms');
       const hasSmsOption = await smsRadio.count() > 0;
@@ -791,7 +651,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           }
         }
         
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(150);
         
         // Verifiziere dass SMS ausgewählt ist
         const isChecked = await smsRadio.isChecked().catch(() => false);
@@ -802,11 +662,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 4: "Code senden" klicken - SMS wird versendet
       console.log('📱 SCHRITT 4: Klicke "Code senden"...');
-      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
+      const codeSendenButton = page.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenButton.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenButton.click();
       console.log('✅ "Code senden" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 5: SMS-Code aus weitergeleiteter E-Mail holen (iPhone-Weiterleitung)
       console.log('📱 SCHRITT 5: Warte auf weitergeleitete SMS per E-Mail vom iPhone...');
@@ -859,28 +720,23 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         throw new Error('SMS-Eingabefeld nicht gefunden');
       }
 
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await smsInput.fill(smsCode);
       console.log('✅ SMS-Code eingegeben');
 
       // SCHRITT 7: Warte auf Auto-Submit
       console.log('⏳ SCHRITT 7: Warte auf Auto-Submit und Navigation...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 8: "Passwort ändern" klicken
-      console.log('🔐 SCHRITT 8: Suche "Passwort ändern" Link...');
-      const passwordChangeLink = page.locator('a:has-text("Passwort ändern")').first();
-      
-      if (await passwordChangeLink.count() === 0) {
-        throw new Error('Konnte "Passwort ändern" Link nicht finden');
-      }
-
-      console.log('✅ "Passwort ändern" Link gefunden');
+      console.log('🔐 SCHRITT 8: Klicke "Passwort ändern"...');
+      const passwordChangeLink = page.locator('a.c24-uli-pwr-pw-link').first();
+      await passwordChangeLink.waitFor({ state: 'visible', timeout: 10000 });
       await passwordChangeLink.click();
       console.log('✅ "Passwort ändern" geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 9: Neues Passwort eingeben
       console.log('🔐 SCHRITT 9: Gebe neues Passwort ein...');
@@ -910,34 +766,11 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 10: "Speichern und weiter" klicken
       console.log('💾 SCHRITT 10: Klicke "Speichern und weiter"...');
-      
-      const saveButtonSelectors = [
-        'button:has-text("Speichern und weiter")',
-        'button:has-text("Speichern")',
-        '[type="submit"]:has-text("Speichern")',
-      ];
-
-      let saveButton = null;
-      for (const selector of saveButtonSelectors) {
-        const button = page.locator(selector).first();
-        if (await button.count() > 0) {
-          const isVisible = await button.isVisible().catch(() => false);
-          if (isVisible) {
-            saveButton = button;
-            console.log(`✅ "Speichern und weiter" gefunden mit: ${selector}`);
-            break;
-          }
-        }
-      }
-
-      if (!saveButton) {
-        throw new Error('Konnte "Speichern und weiter" Button nicht finden');
-      }
-
+      const saveButton = page.locator('#c24-uli-pwr-pw-btn');
+      await saveButton.waitFor({ state: 'visible', timeout: 10000 });
       await saveButton.click();
       console.log('✅ "Speichern und weiter" geklickt');
-
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 11: Prüfe auf Bestätigungsmail für Passwort-Änderung
       console.log('📧 SCHRITT 11: Prüfe auf Bestätigungsmail für Passwort-Änderung...');
@@ -970,7 +803,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(150);
       }
 
       // SCHRITT 13: Login-Erfolg verifizieren
@@ -1006,53 +839,29 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
       const emailInput = page.locator('#cl_login');
       await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
       await emailInput.fill(credentials.email);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       // "Weiter" klicken
       console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      const weiterButton = page.locator('#c24-uli-login-btn');
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 2: "Passwort vergessen?" klicken
-      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
-      
-      const forgotPasswordSelectors = [
-        'a:has-text("Passwort vergessen?")',
-        'button:has-text("Passwort vergessen?")',
-        '[data-tid*="forgot"]',
-        'a:has-text("Passwort")',
-      ];
-
-      let forgotPasswordLink = null;
-      for (const selector of forgotPasswordSelectors) {
-        const element = page.locator(selector).first();
-        if (await element.count() > 0) {
-          const isVisible = await element.isVisible().catch(() => false);
-          if (isVisible) {
-            forgotPasswordLink = element;
-            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
-            break;
-          }
-        }
-      }
-
-      if (!forgotPasswordLink) {
-        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
-      }
-
-      await forgotPasswordLink.click();
+      console.log('🔑 SCHRITT 2: Klicke "Passwort vergessen?"...');
+      const forgotPasswordWrapper = page.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await forgotPasswordWrapper.waitFor({ state: 'visible', timeout: 10000 });
+      await forgotPasswordWrapper.click();
       console.log('✅ "Passwort vergessen?" geklickt');
-
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 3: Selection Screen - E-Mail auswählen
       console.log('🔍 SCHRITT 3: Prüfe auf Selection Screen...');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       const emailRadio = page.locator('#c24-uli-choose-email');
       const hasEmailOption = await emailRadio.count() > 0;
@@ -1076,7 +885,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           }
         }
         
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(150);
         
         // Verifiziere dass E-Mail ausgewählt ist
         const isChecked = await emailRadio.isChecked().catch(() => false);
@@ -1087,11 +896,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 4: "Code senden" klicken
       console.log('📧 SCHRITT 4: Klicke "Code senden"...');
-      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
+      const codeSendenButton = page.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenButton.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenButton.click();
       console.log('✅ "Code senden" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // E-Mail Client initialisieren (wird für mehrere Schritte benötigt)
       const emailClient = getEmailClient();
@@ -1162,14 +972,14 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         throw new Error('Konnte erstes TAN-Eingabefeld nicht finden');
       }
 
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await tanInput.fill(tanCode);
       console.log('✅ Erster TAN-Code eingegeben');
 
       // SCHRITT 7: Warte auf nächsten Screen mit SMS-TAN-Anforderung
       console.log('⏳ SCHRITT 7: Warte auf Screen-Update (2FA SMS-TAN wird versendet)...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(1200);
 
       // SCHRITT 8: Zweiter TAN-Code per SMS aus weitergeleiteter E-Mail holen
       console.log('📱 SCHRITT 8: Warte auf zweiten TAN-Code per SMS (via iPhone-Weiterleitung)...');
@@ -1209,7 +1019,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 9: Suche nach 6 separaten Eingabefeldern für SMS-Code (wie beim 2FA Login)
       console.log('🔍 SCHRITT 9: Suche SMS-Code-Eingabefelder (6 separate Felder)...');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
       // CHECK24 verwendet 6 separate Input-Felder für den 6-stelligen Code
       const allCodeFields = page.locator('input[type="text"][placeholder=" "]');
@@ -1241,7 +1051,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           try {
             await field.fill(digit);
             console.log(`  ✓ Ziffer ${i + 1}/6 eingegeben: ${digit}`);
-            await page.waitForTimeout(100);
+            await page.waitForTimeout(50);
           } catch (fillError) {
             console.log(`  ⚠️  Ziffer ${i + 1} fill() fehlgeschlagen, versuche JavaScript...`);
             await field.evaluate((el: any, d: string) => {
@@ -1273,12 +1083,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           throw new Error('SMS-Eingabefeld nicht gefunden');
         }
 
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(200);
         await smsInput.fill(smsCode);
         console.log('✅ SMS-Code eingegeben');
       }
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
       // SCHRITT 10: Nach SMS-Code Enter drücken / Weiter klicken
       console.log('➡️  SCHRITT 10: Klicke "Weiter" nach SMS-Code-Eingabe...');
@@ -1298,77 +1108,51 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         }
       }
 
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(600);
 
       // SCHRITT 11: Warte auf Screen mit "Passwort ändern" und "Weiter"
       console.log('🔍 SCHRITT 11: Warte auf Screen mit "Passwort ändern" / "Weiter"...');
       await page.waitForLoadState('networkidle', { timeout: 10000 });
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
 
       const currentBodyText = await page.locator('body').textContent() || '';
       
-      // Prüfe auf Cookie-Banner und akzeptiere BEVOR wir auf "Weiter" klicken
+      // Cookie-Banner schließen (wie in auth.ts / otp-happy-path: "geht klar" Button)
       if (currentBodyText.toLowerCase().includes('cookie') || currentBodyText.toLowerCase().includes('geht klar')) {
-        console.log('🍪 Cookie-Banner erkannt - schließe schnell via JavaScript...');
-        
-        // Schließe Cookie-Banner schnell via JavaScript
-        const cookieLink = page.locator('a:has-text("Nur notwendige Cookies")').first();
-        if (await cookieLink.count() > 0) {
-          try {
-            await cookieLink.evaluate((e: any) => e.click());
-            console.log('✅ Cookie-Banner geschlossen');
-          } catch (e) {
-            // Ignoriere
+        console.log('🍪 Cookie-Banner erkannt - klicke "geht klar"...');
+        const cookieBtn = page.locator('a.c24-cookie-consent-button');
+        if (await cookieBtn.count() > 0) {
+          const clicked = await page.evaluate((sel: string) => {
+            const g = globalThis as unknown as { document?: { querySelectorAll: (s: string) => unknown[] } };
+            const doc = g.document;
+            if (!doc) return false;
+            const buttons = Array.from(doc.querySelectorAll(sel));
+            for (const button of buttons) {
+              const el = button as { innerText?: string; textContent?: string; getBoundingClientRect(): { width: number; height: number }; click(): void };
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              const rect = el.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0 && text === 'geht klar') {
+                el.click();
+                return true;
+              }
+            }
+            return false;
+          }, 'a.c24-cookie-consent-button');
+          if (clicked) {
+            await page.waitForTimeout(150);
+            const blockingVisible = await page.locator('.c24-strict-blocking-layer').isVisible().catch(() => false);
+            if (!blockingVisible) console.log('✅ Cookie-Banner geschlossen');
           }
         }
-        await page.waitForTimeout(500);
       }
 
-      // SCHRITT 12: Klicke "Weiter" (NICHT "Passwort ändern")
-      console.log('➡️  SCHRITT 12: Klicke "Weiter" (ohne Passwort zu ändern)...');
-      
-      await page.waitForTimeout(300);
-      
-      // Finde den SICHTBAREN "weiter" Button (es gibt viele, aber nur einer ist sichtbar!)
-      const allWeiterButtons = await page.locator('button[type="submit"]:has-text("weiter")').all();
-      let weiterButtonStep12 = null;
-      
-      console.log(`🔍 Suche sichtbaren "weiter" Button unter ${allWeiterButtons.length} Buttons...`);
-      
-      for (const btn of allWeiterButtons) {
-        const isVisible = await btn.isVisible().catch(() => false);
-        if (isVisible) {
-          weiterButtonStep12 = btn;
-          const btnText = await btn.textContent();
-          console.log(`✅ SICHTBAREN "Weiter" Button gefunden: "${btnText?.trim()}"`);
-          break;
-        }
-      }
-      
-      if (!weiterButtonStep12) {
-        console.log('⚠️  Kein sichtbarer "weiter" Button gefunden, nehme ersten Button');
-        weiterButtonStep12 = allWeiterButtons[0];
-      }
-
-      if (weiterButtonStep12) {
-        try {
-          const isVisible = await weiterButtonStep12.isVisible().catch(() => false);
-          if (isVisible) {
-            await weiterButtonStep12.click({ timeout: 5000 });
-            console.log('✅ "Weiter" geklickt');
-          } else {
-            // Button nicht sichtbar, verwende JavaScript
-            await weiterButtonStep12.evaluate((el: any) => el.click());
-            console.log('✅ "Weiter" geklickt (via JavaScript)');
-          }
-        } catch (e) {
-          throw new Error(`Konnte "Weiter" Button nicht klicken: ${e}`);
-        }
-      } else {
-        throw new Error('Konnte "Weiter" Button nicht finden');
-      }
-
-      await page.waitForTimeout(3000);
+      // SCHRITT 12: Klicke "Weiter" (ohne Passwort zu ändern) – ID wie von dir angegeben
+      console.log('➡️  SCHRITT 12: Klicke "Weiter"...');
+      const weiterButtonStep12 = page.locator('#c24-uli-pwr-login-btn');
+      await weiterButtonStep12.waitFor({ state: 'visible', timeout: 10000 });
+      await weiterButtonStep12.click();
+      console.log('✅ "Weiter" geklickt');
+      await page.waitForTimeout(1200);
 
       // SCHRITT 13: Login-Erfolg verifizieren
       console.log('🔍 SCHRITT 13: Prüfe Login-Erfolg...');
@@ -1383,7 +1167,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // Warte zusätzlich, da c24session Cookie möglicherweise verzögert gesetzt wird
       console.log('⏳ Warte zusätzliche Zeit für c24session Cookie...');
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(150);
       
       // Prüfe nochmal URL
       const finalUrl = page.url();
@@ -1423,53 +1207,29 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
       const emailInput = page.locator('#cl_login');
       await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
       await emailInput.fill(credentials.email);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       // "Weiter" klicken
       console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      const weiterButton = page.locator('#c24-uli-login-btn');
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 2: "Passwort vergessen?" klicken
-      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
-      
-      const forgotPasswordSelectors = [
-        'a:has-text("Passwort vergessen?")',
-        'button:has-text("Passwort vergessen?")',
-        '[data-tid*="forgot"]',
-        'a:has-text("Passwort")',
-      ];
-
-      let forgotPasswordLink = null;
-      for (const selector of forgotPasswordSelectors) {
-        const element = page.locator(selector).first();
-        if (await element.count() > 0) {
-          const isVisible = await element.isVisible().catch(() => false);
-          if (isVisible) {
-            forgotPasswordLink = element;
-            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
-            break;
-          }
-        }
-      }
-
-      if (!forgotPasswordLink) {
-        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
-      }
-
-      await forgotPasswordLink.click();
+      console.log('🔑 SCHRITT 2: Klicke "Passwort vergessen?"...');
+      const forgotPasswordWrapper = page.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await forgotPasswordWrapper.waitFor({ state: 'visible', timeout: 10000 });
+      await forgotPasswordWrapper.click();
       console.log('✅ "Passwort vergessen?" geklickt');
-
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 3: Selection Screen - E-Mail sollte bereits ausgewählt sein
       console.log('🔍 SCHRITT 3: Prüfe auf Selection Screen...');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       const emailRadio = page.locator('#c24-uli-choose-email');
       const hasEmailOption = await emailRadio.count() > 0;
@@ -1497,11 +1257,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 4: "Code senden" klicken
       console.log('📧 SCHRITT 4: Klicke "Code senden"...');
-      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
+      const codeSendenButton = page.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenButton.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenButton.click();
       console.log('✅ "Code senden" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // E-Mail Client initialisieren
       const emailClient = getEmailClient();
@@ -1571,7 +1332,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         throw new Error('Konnte TAN-Eingabefeld nicht finden');
       }
 
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await tanInput.fill(tanCode);
       console.log('✅ TAN-Code eingegeben');
       
@@ -1582,93 +1343,32 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // SCHRITT 7: Warte auf Phone-TAN Screen
       console.log('⏳ SCHRITT 7: Warte auf Phone-TAN Screen...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
-      // SCHRITT 8: Klicke auf "auf andere Art bestätigen" Link/Button
-      console.log('🔍 SCHRITT 8: Suche "auf andere Art bestätigen" Link...');
-      
-      const alternativeAuthSelectors = [
-        'a:has-text("auf andere Art bestätigen")',
-        'button:has-text("auf andere Art bestätigen")',
-        'a:has-text("andere Art")',
-        'button:has-text("andere Art")',
-      ];
-
-      let alternativeAuthLink = null;
-      for (const selector of alternativeAuthSelectors) {
-        try {
-          const elements = await page.locator(selector).all();
-          
-          for (const element of elements) {
-            const text = await element.textContent().catch(() => '');
-            const isVisible = await element.isVisible().catch(() => false);
-            
-            if (text && text.toLowerCase().includes('andere art') && isVisible) {
-              alternativeAuthLink = element;
-              console.log(`✅ Alternative Auth Link gefunden: "${text.trim()}"`);
-              break;
-            }
-          }
-          
-          if (alternativeAuthLink) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!alternativeAuthLink) {
-        throw new Error('Konnte "auf andere Art bestätigen" Link/Button nicht finden');
-      }
-
-      await alternativeAuthLink.click();
+      // SCHRITT 8: Klicke "auf andere Art bestätigen" (Link kann in verstecktem Container sein)
+      console.log('🔍 SCHRITT 8: Klicke "auf andere Art bestätigen"...');
+      const alternativeAuthLink = page.locator('a.c24-uli-mfa-other').first();
+      await alternativeAuthLink.waitFor({ state: 'attached', timeout: 10000 });
+      await alternativeAuthLink.evaluate((el: unknown) => (el as { click(): void }).click());
       console.log('✅ "auf andere Art bestätigen" geklickt');
+      await page.waitForTimeout(150);
 
-      await page.waitForTimeout(2000);
-
-      // SCHRITT 9: IBAN-Eingabefeld finden und IBAN eingeben
-      console.log('🏦 SCHRITT 9: Suche IBAN-Eingabefeld...');
+      // SCHRITT 9: Sicherheitsfrage/IBAN-Eingabe (#cl_sq)
+      console.log('🏦 SCHRITT 9: Eingabefeld für Sicherheitsfrage/IBAN...');
       await page.waitForLoadState('networkidle', { timeout: 10000 });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
-      const ibanSelectors = [
-        'input[name*="iban"]',
-        'input[id*="iban"]',
-        'input[placeholder*="IBAN"]',
-        'input[placeholder*="iban"]',
-        'input[type="text"]',
-      ];
-
-      let ibanInput = null;
-      for (const selector of ibanSelectors) {
-        try {
-          const inputs = await page.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              ibanInput = input;
-              console.log(`✅ IBAN-Eingabefeld gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (ibanInput) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!ibanInput) {
-        throw new Error('Konnte IBAN-Eingabefeld nicht finden');
-      }
+      const ibanInput = page.locator('#cl_sq');
+      await ibanInput.waitFor({ state: 'visible', timeout: 10000 });
 
       // IBAN eingeben (hart gecoded)
       const iban = 'DE57370502990101508141';
       console.log(`🏦 Gebe IBAN ein: ${iban}`);
-      
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await ibanInput.fill(iban);
       console.log('✅ IBAN eingegeben');
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
       // SCHRITT 10: "Weiter" Button nach IBAN-Eingabe klicken
       console.log('➡️  SCHRITT 10: Suche "Weiter" Button nach IBAN-Eingabe...');
@@ -1712,12 +1412,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log('✅ "Weiter" Button geklickt (force)');
       }
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 11: Warte auf nächsten Screen und klicke wieder auf "Weiter"
       console.log('⏳ SCHRITT 11: Warte auf nächsten Screen...');
       await page.waitForLoadState('networkidle', { timeout: 10000 });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
       console.log('➡️  SCHRITT 11: Suche finalen "Weiter" Button...');
       
@@ -1765,7 +1465,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite (Kundenbereich)
       console.log('⏳ SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite...');
       await page.waitForLoadState('networkidle', { timeout: 15000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // Warte auf Kundenbereich URL
       try {
@@ -1773,7 +1473,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(1200);
       }
 
       // SCHRITT 13: Prüfe c24session Cookie
@@ -1843,53 +1543,29 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       console.log('📧 SCHRITT 1: Gebe E-Mail ein...');
       const emailInput = page.locator('#cl_login');
       await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
       await emailInput.fill(credentials.email);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       // "Weiter" klicken
       console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      const weiterButton = page.locator('#c24-uli-login-btn');
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 2: "Passwort vergessen?" klicken
-      console.log('🔑 SCHRITT 2: Suche "Passwort vergessen?" Link...');
-      
-      const forgotPasswordSelectors = [
-        'a:has-text("Passwort vergessen?")',
-        'button:has-text("Passwort vergessen?")',
-        '[data-tid*="forgot"]',
-        'a:has-text("Passwort")',
-      ];
-
-      let forgotPasswordLink = null;
-      for (const selector of forgotPasswordSelectors) {
-        const element = page.locator(selector).first();
-        if (await element.count() > 0) {
-          const isVisible = await element.isVisible().catch(() => false);
-          if (isVisible) {
-            forgotPasswordLink = element;
-            console.log(`✅ "Passwort vergessen?" gefunden mit: ${selector}`);
-            break;
-          }
-        }
-      }
-
-      if (!forgotPasswordLink) {
-        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
-      }
-
-      await forgotPasswordLink.click();
+      console.log('🔑 SCHRITT 2: Klicke "Passwort vergessen?"...');
+      const forgotPasswordWrapper = page.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await forgotPasswordWrapper.waitFor({ state: 'visible', timeout: 10000 });
+      await forgotPasswordWrapper.click();
       console.log('✅ "Passwort vergessen?" geklickt');
-
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 3: Selection Screen - SMS auswählen (statt E-Mail)
       console.log('🔍 SCHRITT 3: Prüfe auf Selection Screen...');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       
       const smsRadio = page.locator('#c24-uli-choose-sms');
       const hasSmsOption = await smsRadio.count() > 0;
@@ -1915,7 +1591,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
           }
         }
         
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(150);
         
         // Verifiziere dass SMS ausgewählt ist
         const isChecked = await smsRadio.isChecked().catch(() => false);
@@ -1930,11 +1606,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
 
       // SCHRITT 4: "Code senden" klicken - SMS wird versendet
       console.log('📱 SCHRITT 4: Klicke "Code senden" - SMS wird versendet...');
-      const codeSendenButton = page.getByRole('button', { name: 'Code senden' });
+      const codeSendenButton = page.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenButton.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenButton.click();
       console.log('✅ "Code senden" wurde geklickt');
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // E-Mail Client initialisieren
       const emailClient = getEmailClient();
@@ -1998,7 +1675,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         throw new Error('SMS-Eingabefeld nicht gefunden');
       }
 
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await smsInput.fill(smsCode);
       console.log('✅ SMS-Code eingegeben');
       
@@ -2009,92 +1686,31 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // SCHRITT 7: Warte auf E-Mail-TAN Screen
       console.log('⏳ SCHRITT 7: Warte auf E-Mail-TAN Screen...');
       await page.waitForLoadState('networkidle', { timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
-      // SCHRITT 8: Klicke auf "auf andere Art bestätigen" Link/Button
-      console.log('🔍 SCHRITT 8: Suche "auf andere Art bestätigen" Link...');
-      
-      const alternativeAuthSelectors = [
-        'a:has-text("auf andere Art bestätigen")',
-        'button:has-text("auf andere Art bestätigen")',
-        'a:has-text("andere Art")',
-        'button:has-text("andere Art")',
-      ];
-
-      let alternativeAuthLink = null;
-      for (const selector of alternativeAuthSelectors) {
-        try {
-          const elements = await page.locator(selector).all();
-          
-          for (const element of elements) {
-            const text = await element.textContent().catch(() => '');
-            const isVisible = await element.isVisible().catch(() => false);
-            
-            if (text && text.toLowerCase().includes('andere art') && isVisible) {
-              alternativeAuthLink = element;
-              console.log(`✅ Alternative Auth Link gefunden: "${text.trim()}"`);
-              break;
-            }
-          }
-          
-          if (alternativeAuthLink) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!alternativeAuthLink) {
-        throw new Error('Konnte "auf andere Art bestätigen" Link/Button nicht finden');
-      }
-
-      await alternativeAuthLink.click();
+      // SCHRITT 8: Klicke "auf andere Art bestätigen" (Link kann in verstecktem Container sein)
+      console.log('🔍 SCHRITT 8: Klicke "auf andere Art bestätigen"...');
+      const alternativeAuthLink = page.locator('a.c24-uli-mfa-other').first();
+      await alternativeAuthLink.waitFor({ state: 'attached', timeout: 10000 });
+      await alternativeAuthLink.evaluate((el: unknown) => (el as { click(): void }).click());
       console.log('✅ "auf andere Art bestätigen" geklickt');
+      await page.waitForTimeout(150);
 
-      await page.waitForTimeout(2000);
-
-      // SCHRITT 9: IBAN-Eingabefeld finden und IBAN eingeben
-      console.log('🏦 SCHRITT 9: Suche IBAN-Eingabefeld...');
+      // SCHRITT 9: Sicherheitsfrage/IBAN-Eingabe (#cl_sq)
+      console.log('🏦 SCHRITT 9: Eingabefeld für Sicherheitsfrage/IBAN...');
       await page.waitForLoadState('networkidle', { timeout: 10000 });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
-      const ibanSelectors = [
-        'input[name*="iban"]',
-        'input[id*="iban"]',
-        'input[placeholder*="IBAN"]',
-        'input[type="text"]',
-      ];
-
-      let ibanInput = null;
-      for (const selector of ibanSelectors) {
-        try {
-          const inputs = await page.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              ibanInput = input;
-              console.log(`✅ IBAN-Eingabefeld gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (ibanInput) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!ibanInput) {
-        throw new Error('Konnte IBAN-Eingabefeld nicht finden');
-      }
+      const ibanInput = page.locator('#cl_sq');
+      await ibanInput.waitFor({ state: 'visible', timeout: 10000 });
 
       // IBAN eingeben
       const iban = 'DE57370502990101508141';
       console.log(`🏦 Gebe IBAN ein: ${iban}`);
-      
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(200);
       await ibanInput.fill(iban);
       console.log('✅ IBAN eingegeben');
-
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
       // SCHRITT 10: "Weiter" Button nach IBAN-Eingabe klicken
       console.log('➡️  SCHRITT 10: Suche "Weiter" Button nach IBAN-Eingabe...');
@@ -2140,12 +1756,12 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log('✅ "Weiter" Button geklickt (force)');
       }
 
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // SCHRITT 11: Warte auf nächsten Screen und klicke wieder auf "Weiter"
       console.log('⏳ SCHRITT 11: Warte auf nächsten Screen...');
       await page.waitForLoadState('networkidle', { timeout: 10000 });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
       console.log('➡️  SCHRITT 11: Suche finalen "Weiter" Button...');
       
@@ -2192,7 +1808,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite (Kundenbereich)
       console.log('⏳ SCHRITT 12: Warte auf Weiterleitung zur Callback-Seite...');
       await page.waitForLoadState('networkidle', { timeout: 15000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(150);
 
       // Warte auf Kundenbereich URL
       try {
@@ -2200,7 +1816,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
         console.log('✅ Zum Kundenbereich weitergeleitet');
       } catch (e) {
         console.log(`⚠️  Weiterleitung dauert länger - aktuelle URL: ${page.url()}`);
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(1200);
       }
 
       // SCHRITT 13: Prüfe c24session Cookie
