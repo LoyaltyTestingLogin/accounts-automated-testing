@@ -55,7 +55,7 @@ test.describe('CHECK24 Login - Passkey', () => {
 
       // 3. "Weiter" klicken
       console.log('🖱️  Klicke auf "Weiter"');
-      await page.getByRole('button', { name: 'Weiter' }).click();
+      await page.locator('#c24-uli-login-btn').click();
       await page.waitForLoadState('networkidle');
       
       console.log('⏳ Warte 3 Sekunden auf Passkey-Button...');
@@ -64,7 +64,7 @@ test.describe('CHECK24 Login - Passkey', () => {
       // 4. Passkey-Button finden und klicken
       console.log('🔍 Suche "mit Passkey anmelden" Button...');
       
-      const passkeyButton = page.getByText(/mit Passkey anmelden/i);
+      const passkeyButton = page.locator('.c24-uli-trigger-passkey-button');
       await passkeyButton.waitFor({ state: 'visible', timeout: 10000 });
       
       console.log('✅ Passkey-Button gefunden!');
