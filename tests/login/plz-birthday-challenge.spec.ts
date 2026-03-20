@@ -5,6 +5,11 @@ import { getEmailClient, EmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl, getKundenbereichUrl, getEnvironment } from '../helpers/environment';
 import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
+import {
+  COOKIE_GEHT_KLAR_SELECTOR,
+  COOKIE_BANNER_PROBE_TIMEOUT_MS,
+  COOKIE_AFTER_CLICK_MS,
+} from '../helpers/cookie-consent';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -491,13 +496,13 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       
       // Cookie-Banner schließen falls vorhanden
       console.log('🍪 Prüfe auf Cookie-Banner...');
-      await registrationPage.waitForTimeout(2000);
-      
+      await registrationPage.waitForTimeout(400);
+
       try {
-        const gehtKlar = registrationPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
-        if (await gehtKlar.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const gehtKlar = registrationPage.locator(COOKIE_GEHT_KLAR_SELECTOR).first();
+        if (await gehtKlar.isVisible({ timeout: COOKIE_BANNER_PROBE_TIMEOUT_MS }).catch(() => false)) {
           await gehtKlar.click();
-          await registrationPage.waitForTimeout(400);
+          await registrationPage.waitForTimeout(COOKIE_AFTER_CLICK_MS);
           console.log('✅ Cookie-Banner geschlossen mit "geht klar"');
         } else {
           console.log('ℹ️  Kein Cookie-Banner mit "geht klar" gefunden');
@@ -1478,10 +1483,10 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       // Cookie-Banner schließen (falls vorhanden)
       console.log('   Prüfe auf Cookie-Banner...');
       try {
-        const cookieBannerButton = otpEmailPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
-        if (await cookieBannerButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const cookieBannerButton = otpEmailPage.locator(COOKIE_GEHT_KLAR_SELECTOR).first();
+        if (await cookieBannerButton.isVisible({ timeout: COOKIE_BANNER_PROBE_TIMEOUT_MS }).catch(() => false)) {
           await cookieBannerButton.click();
-          await otpEmailPage.waitForTimeout(400);
+          await otpEmailPage.waitForTimeout(COOKIE_AFTER_CLICK_MS);
           console.log('   ✅ Cookie-Banner geschlossen');
         }
       } catch (e) {
@@ -1884,10 +1889,10 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       
       console.log('🍪 Prüfe auf Cookie-Banner...');
       try {
-        const cookieBanner = registrationPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
-        if (await cookieBanner.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const cookieBanner = registrationPage.locator(COOKIE_GEHT_KLAR_SELECTOR).first();
+        if (await cookieBanner.isVisible({ timeout: COOKIE_BANNER_PROBE_TIMEOUT_MS }).catch(() => false)) {
           await cookieBanner.click();
-          await registrationPage.waitForTimeout(400);
+          await registrationPage.waitForTimeout(COOKIE_AFTER_CLICK_MS);
           console.log('✅ Cookie-Banner geschlossen mit "geht klar"');
         }
       } catch (e) {
@@ -2604,10 +2609,10 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       
       console.log('   Prüfe auf Cookie-Banner...');
       try {
-        const cookieBannerButton = otpEmailPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
-        if (await cookieBannerButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const cookieBannerButton = otpEmailPage.locator(COOKIE_GEHT_KLAR_SELECTOR).first();
+        if (await cookieBannerButton.isVisible({ timeout: COOKIE_BANNER_PROBE_TIMEOUT_MS }).catch(() => false)) {
           await cookieBannerButton.click();
-          await otpEmailPage.waitForTimeout(400);
+          await otpEmailPage.waitForTimeout(COOKIE_AFTER_CLICK_MS);
           console.log('   ✅ Cookie-Banner geschlossen');
         }
       } catch (e) {

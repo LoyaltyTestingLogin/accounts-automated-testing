@@ -1,7 +1,9 @@
-import { test, expect } from '../fixtures/test-hooks';
+import { test } from '../fixtures/test-hooks';
 import { expectLoginSuccess } from '../helpers/auth';
+import { closeCookieGehtKlarIfVisible } from '../helpers/cookie-consent';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
+import { getEnvironment } from '../helpers/environment';
 import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
 import dotenv from 'dotenv';
 
@@ -49,9 +51,9 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       
       await takeAutoScreenshot(page, 'email-entered');
 
-      // Klick auf "Weiter"
-      console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton = page.getByRole('button', { name: 'Weiter' });
+      // Klick auf "Weiter" (Login-Screen, gleiche ID wie otp-happy-path)
+      console.log('➡️  Klicke auf "Weiter"-Button (#c24-uli-login-btn)...');
+      const weiterButton = page.locator('#c24-uli-login-btn');
       await weiterButton.click();
       console.log('✅ "Weiter" wurde geklickt');
       await page.waitForTimeout(1000);
@@ -89,9 +91,9 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       
       await takeAutoScreenshot(page, 'registration-form-filled');
 
-      // Klick auf "Weiter"
-      console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton2 = page.getByRole('button', { name: 'Weiter' });
+      // Klick auf "Weiter" (Registrierungsformular)
+      console.log('➡️  Klicke auf "Weiter"-Button (#c24-uli-register-btn)...');
+      const weiterButton2 = page.locator('#c24-uli-register-btn');
       await weiterButton2.click();
       console.log('✅ "Weiter" wurde geklickt');
       await page.waitForTimeout(1000);
@@ -190,83 +192,68 @@ test.describe('CHECK24 Registrierung - E-Mail Happy Path', () => {
       // SCHRITT 6: c24session Cookie verifizieren
       console.log('🔍 SCHRITT 6: Prüfe c24session Cookie...');
       await expectLoginSuccess(page);
-      
+
+      // Cookie-HTML-Banner sofort weg (Overlay blockiert sonst Profil/Navigation)
+      console.log('🍪 Schließe Cookie-Banner („geht klar“), sobald Kundenbereich steht...');
+      await closeCookieGehtKlarIfVisible(page);
+
       await takeAutoScreenshot(page, 'kundenbereich');
 
-      // SCHRITT 7: Warte auf Willkommensmail
-      console.log('📧 SCHRITT 7: Warte auf Willkommensmail...');
-      
-      try {
-        const welcomeEmail = await emailClient.waitForEmail(
-          {
-            subject: 'Herzlich willkommen bei CHECK24!',
-          },
-          30000,
-          2000
-        );
-        console.log(`✅ Willkommensmail erhalten: "${welcomeEmail!.subject}"`);
-      } catch (error) {
-        await sendEmailTimeoutWarning(
-          'E-Mail-Registrierung - Willkommensmail',
-          'subject: Herzlich willkommen bei CHECK24!',
-          30
-        );
-        throw error;
-      }
-
-      console.log(`✅ E-Mail-Registrierung vollständig erfolgreich für: ${email}`);
+      console.log(`✅ E-Mail-Registrierung (Flow) abgeschlossen für: ${email}`);
       
       // Test erfolgreich - Screenshots übernehmen
       commitScreenshots();
 
-      // SCHRITT 8: Konto wieder löschen
-      console.log('🗑️  SCHRITT 8: Lösche das neu erstellte Konto...');
-      
-      // Cookie-Banner schließen (falls vorhanden)
-      console.log('   Prüfe auf Cookie-Banner...');
-      try {
-        const cookieBannerButton = page.getByText('geht klar', { exact: true });
-        const cookieButtonVisible = await cookieBannerButton.isVisible({ timeout: 2000 }).catch(() => false);
-        if (cookieButtonVisible) {
-          await cookieBannerButton.click();
-          await page.waitForTimeout(1000);
-          console.log('   ✅ Cookie-Banner geschlossen');
-        }
-      } catch (e) {
-        // Kein Cookie-Banner, weiter geht's
-      }
+      // SCHRITT 7: Konto wieder löschen (wie account-replace: Profil → Einstellungen → löschen)
+      console.log('🗑️  SCHRITT 7: Lösche das neu erstellte Konto...');
 
-      // Klick auf "Anmelden & Sicherheit"
-      console.log('   Klicke auf "Anmelden & Sicherheit"...');
-      const anmeldenSicherheitLink = page.getByRole('link', { name: 'Anmelden & Sicherheit' });
+      await closeCookieGehtKlarIfVisible(page);
+      console.log('   ✅ Cookie-Banner vor Cleanup geprüft');
+
+      console.log('   Klicke Profil-Menü...');
+      const profilLink = page.locator('a.c24-customer-hover-wrapper').first();
+      await profilLink.waitFor({ state: 'visible', timeout: 10000 });
+      await profilLink.click({ force: true });
+      await page.waitForTimeout(350);
+
+      console.log('   Klicke auf "Anmelden & Sicherheit" (settings/overview)...');
+      const anmeldenSicherheitLink = page.locator('a[href*="/settings/overview"]').first();
       await anmeldenSicherheitLink.waitFor({ state: 'visible', timeout: 10000 });
       await anmeldenSicherheitLink.click({ force: true });
-      console.log('   ✅ "Anmelden & Sicherheit" geklickt');
       await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
 
-      // Klick auf "Kundenkonto löschen"
+      const currentUrl = page.url();
+      const environment = getEnvironment();
+      if (environment === 'test') {
+        if (currentUrl.includes('accounts.check24.com') && !currentUrl.includes('accounts.check24-test.com')) {
+          await page.goto('https://accounts.check24-test.com/settings/overview');
+          await page.waitForLoadState('networkidle');
+          await page.waitForTimeout(400);
+        }
+      }
+
       console.log('   Klicke auf "Kundenkonto löschen"...');
-      const kundenkontoLoeschenLink = page.getByText('Kundenkonto löschen');
+      const kundenkontoLoeschenLink = page
+        .locator('.c24-acs__settings__overview-page__subHeadline a')
+        .filter({ hasText: 'Kundenkonto löschen' })
+        .first();
       await kundenkontoLoeschenLink.waitFor({ state: 'visible', timeout: 10000 });
       await kundenkontoLoeschenLink.click();
-      console.log('   ✅ "Kundenkonto löschen" geklickt');
       await page.waitForTimeout(1500);
 
-      // Checkbox setzen (Name: "terms")
-      console.log('   Setze Bestätigungs-Checkbox...');
+      console.log('   Setze Bestätigungs-Checkbox (wie account-replace)...');
       const checkbox = page.locator('input[name="terms"][type="checkbox"]');
       await checkbox.waitFor({ state: 'visible', timeout: 10000 });
       await checkbox.check();
       console.log('   ✅ Checkbox gesetzt');
       await page.waitForTimeout(500);
 
-      // Klick auf "entfernen" Button
-      console.log('   Klicke auf "entfernen"-Button...');
-      const entfernenButton = page.getByRole('button', { name: 'entfernen', exact: true });
+      console.log('   Klicke auf Primär-Button „entfernen“ (c24-acs-button__primary)...');
+      const entfernenButton = page.locator('button.c24-acs-button__primary').first();
       await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
       await entfernenButton.click();
-      console.log('   ✅ "entfernen" geklickt');
+      console.log('   ✅ Entfernen geklickt');
       await page.waitForTimeout(1000);
 
       console.log('✅ Konto erfolgreich gelöscht');

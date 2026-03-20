@@ -5,6 +5,7 @@ import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl } from '../helpers/environment';
 import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
+import { COOKIE_GEHT_KLAR_SELECTOR, COOKIE_AFTER_CLICK_MS } from '../helpers/cookie-consent';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -1120,7 +1121,7 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
       // Cookie-Banner schließen (wie in auth.ts / otp-happy-path: "geht klar" Button)
       if (currentBodyText.toLowerCase().includes('cookie') || currentBodyText.toLowerCase().includes('geht klar')) {
         console.log('🍪 Cookie-Banner erkannt - klicke "geht klar"...');
-        const cookieBtn = page.locator('a.c24-cookie-consent-button');
+        const cookieBtn = page.locator(COOKIE_GEHT_KLAR_SELECTOR);
         if (await cookieBtn.count() > 0) {
           const clicked = await page.evaluate((sel: string) => {
             const g = globalThis as unknown as { document?: { querySelectorAll: (s: string) => unknown[] } };
@@ -1137,9 +1138,9 @@ test.describe('CHECK24 Login - Passwort Reset', () => {
               }
             }
             return false;
-          }, 'a.c24-cookie-consent-button');
+          }, COOKIE_GEHT_KLAR_SELECTOR);
           if (clicked) {
-            await page.waitForTimeout(150);
+            await page.waitForTimeout(COOKIE_AFTER_CLICK_MS);
             const blockingVisible = await page.locator('.c24-strict-blocking-layer').isVisible().catch(() => false);
             if (!blockingVisible) console.log('✅ Cookie-Banner geschlossen');
           }

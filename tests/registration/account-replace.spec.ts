@@ -4,22 +4,10 @@ import { expectLoginSuccess } from '../helpers/auth';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl, getKundenbereichUrl, getEnvironment } from '../helpers/environment';
+import { closeCookieGehtKlarIfVisible } from '../helpers/cookie-consent';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-/** Cookie „geht klar“ – wie plz-birthday-challenge / auth-Flows */
-async function closeCookieGehtKlarIfVisible(page: Page): Promise<void> {
-  try {
-    const cookieBannerButton = page.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
-    if (await cookieBannerButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await cookieBannerButton.click();
-      await page.waitForTimeout(400);
-    }
-  } catch {
-    /* kein Banner */
-  }
-}
 
 /**
  * Kundenbereich: Profil → Anmelden & Sicherheit → Konto löschen (wie plz-birthday-challenge.spec.ts)
@@ -30,13 +18,13 @@ async function deleteKontoViaSettingsOverview(page: Page): Promise<void> {
   const profilLink = page.locator('a.c24-customer-hover-wrapper').first();
   await profilLink.waitFor({ state: 'visible', timeout: 10000 });
   await profilLink.click({ force: true });
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(350);
 
   const anmeldenSicherheitLink = page.locator('a[href*="/settings/overview"]').first();
   await anmeldenSicherheitLink.waitFor({ state: 'visible', timeout: 10000 });
   await anmeldenSicherheitLink.click({ force: true });
   await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(400);
 
   const currentUrl = page.url();
   const environment = getEnvironment();
@@ -44,7 +32,7 @@ async function deleteKontoViaSettingsOverview(page: Page): Promise<void> {
     if (currentUrl.includes('accounts.check24.com') && !currentUrl.includes('accounts.check24-test.com')) {
       await page.goto('https://accounts.check24-test.com/settings/overview');
       await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(400);
     }
   }
 

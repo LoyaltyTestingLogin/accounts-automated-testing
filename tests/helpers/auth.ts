@@ -2,6 +2,7 @@ import { Page, expect } from '@playwright/test';
 import dotenv from 'dotenv';
 import { getEmailClient } from './email';
 import { getLoginUrl, getEnvironmentName } from './environment';
+import { COOKIE_GEHT_KLAR_SELECTOR, COOKIE_AFTER_CLICK_MS } from './cookie-consent';
 import { takeAutoScreenshot } from './screenshots';
 
 dotenv.config();
@@ -565,9 +566,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
 
   // Cookie-Banner schließen falls vorhanden
   console.log('🍪 Prüfe auf Cookie-Banner...');
-  const cookieButtonSelectors = [
-    'a.c24-cookie-consent-button',
-  ];
+  const cookieButtonSelectors = [COOKIE_GEHT_KLAR_SELECTOR];
 
   async function clickVisibleGehtKlarButton(selector: string) {
     return await page.evaluate((sel: string) => {
@@ -603,7 +602,7 @@ export async function handleLoginChallenge(page: Page, challengeMethod?: 'email'
           continue;
         }
 
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(COOKIE_AFTER_CLICK_MS);
 
         const blockingLayerVisible = await page.locator('.c24-strict-blocking-layer').isVisible().catch(() => false);
         if (!blockingLayerVisible) {

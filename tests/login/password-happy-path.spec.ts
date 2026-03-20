@@ -4,6 +4,7 @@ import { getAccountCredentials } from '../fixtures/accounts';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
 import { getLoginUrl } from '../helpers/environment';
 import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAutoScreenshots } from '../helpers/screenshots';
+import { COOKIE_GEHT_KLAR_SELECTOR, COOKIE_AFTER_CLICK_MS } from '../helpers/cookie-consent';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -43,18 +44,16 @@ test.describe('CHECK24 Login - Happy Path', () => {
     // ===== COOKIE-BANNER WEGKLICKEN =====
     console.log('\n=== COOKIE-BANNER WEGKLICKEN ===');
     
-    // Warte kurz damit die Seite vollständig geladen ist
-    await page.waitForTimeout(1000);
+    // Kurz warten, dann Cookie-Button prüfen (kein langes festes Delay)
+    await page.waitForTimeout(400);
     
     // Prüfe ob Cookie-Banner vorhanden ist
-    const cookieBannerVisible = await page.locator('a.c24-cookie-consent-button').count() > 0;
+    const cookieBannerVisible = await page.locator(COOKIE_GEHT_KLAR_SELECTOR).count() > 0;
     console.log(`🍪 Cookie-Banner vorhanden: ${cookieBannerVisible}`);
     
     if (cookieBannerVisible) {
       // Versuche Cookie-Banner über verschiedene Methoden wegzuklicken
-      const cookieSelectors = [
-        'a.c24-cookie-consent-button',
-      ];
+      const cookieSelectors = [COOKIE_GEHT_KLAR_SELECTOR];
 
       const clickVisibleGehtKlarButton = async (selector: string) => {
         return await page.evaluate((sel: string) => {
@@ -90,7 +89,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
               continue;
             }
 
-            await page.waitForTimeout(800);
+            await page.waitForTimeout(COOKIE_AFTER_CLICK_MS);
             const blockingLayerVisible = await page.locator('.c24-strict-blocking-layer').isVisible().catch(() => false);
 
             if (!blockingLayerVisible) {
@@ -111,7 +110,7 @@ test.describe('CHECK24 Login - Happy Path', () => {
       }
       
       if (cookieClicked) {
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(COOKIE_AFTER_CLICK_MS);
         console.log('✅ Cookie-Banner sollte jetzt geschlossen sein');
       } else {
         console.log('⚠️  Konnte Cookie-Banner nicht wegklicken - versuche fortzufahren');

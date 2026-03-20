@@ -3,6 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
 import { getEmailClient } from '../tests/helpers/email';
+import {
+  COOKIE_GEHT_KLAR_SELECTOR,
+  COOKIE_BANNER_PROBE_TIMEOUT_MS,
+  COOKIE_AFTER_CLICK_MS,
+} from '../tests/helpers/cookie-consent';
 
 dotenv.config();
 
@@ -150,12 +155,12 @@ async function main() {
     await page2.getByRole('button', { name: 'Weiter' }).click();
     await page2.waitForLoadState('networkidle');
     
-    // Cookie Banner wegklicken falls vorhanden
+    // Cookie Banner wegklicken falls vorhanden (giveConsent('fam'))
     try {
-      const cookieBanner = page2.getByText('geht klar', { exact: true });
-      if (await cookieBanner.isVisible({ timeout: 2000 })) {
+      const cookieBanner = page2.locator(COOKIE_GEHT_KLAR_SELECTOR).first();
+      if (await cookieBanner.isVisible({ timeout: COOKIE_BANNER_PROBE_TIMEOUT_MS }).catch(() => false)) {
         await cookieBanner.click();
-        await page2.waitForTimeout(1000);
+        await page2.waitForTimeout(COOKIE_AFTER_CLICK_MS);
       }
     } catch (e) {}
     
