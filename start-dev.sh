@@ -23,10 +23,14 @@ if ! command -v node &>/dev/null; then
   exit 1
 fi
 
-if [[ ! -d node_modules ]]; then
-  echo "Abhängigkeiten installieren..."
-  npm install
-fi
+# Immer ausführen: nach git pull kann package-lock/package.json geändert sein;
+# nur bei fehlendem node_modules zu installieren reicht dann nicht.
+echo "npm install (Abhängigkeiten / nach Pull aktualisieren)..."
+npm install
+
+# Playwright-Browser – ohne Chromium schlagen alle E2E-Tests fehl (häufig auf neuem Rechner).
+echo "Playwright Chromium sicherstellen..."
+npx playwright install chromium
 
 echo "Starte API (Port 4000), Worker und Frontend (Port 3000)..."
 npm run dev

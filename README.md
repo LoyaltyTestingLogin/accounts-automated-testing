@@ -74,10 +74,12 @@ check24-login-testing/
    npm install
    ```
 
-3. **Playwright-Browser installieren**
+3. **Playwright-Browser installieren** (Pflicht – ohne Browser starten keine Tests)
    ```bash
    npm run install:playwright
    ```
+
+   > **Anderer Rechner / nach `git pull`:** Wenn dort **gar nichts** mehr läuft, meist fehlende Browser oder veraltete `node_modules`. Kurz: `npm install && npx playwright install chromium`, `.env` wie auf dem funktionierenden Rechner anlegen. Details: **[docs/SETUP-ANDERER-RECHNER.md](docs/SETUP-ANDERER-RECHNER.md)**.
 
 4. **Umgebungsvariablen konfigurieren**
    ```bash
