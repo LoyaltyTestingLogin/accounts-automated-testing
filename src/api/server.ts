@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { getDatabase } from '../database/schema';
-import { getPlaywrightRunner, testLogEmitter } from '../runner/playwright-runner';
+import { getPlaywrightRunner, lastProgressPayloadByRunId, testLogEmitter } from '../runner/playwright-runner';
 import { getSlackNotifier } from '../slack/notifier';
 
 dotenv.config();
@@ -235,10 +235,23 @@ app.get('/api/test-logs/:runId/stream', (req, res) => {
   // Initiale Verbindungsnachricht
   res.write(`data: ${JSON.stringify({ type: 'connected', runId })}\n\n`);
 
+  // Tab verbindet oft erst nach Start: zuletzt bekannten Fortschritt sofort nachsenden
+  const cached = lastProgressPayloadByRunId.get(runId);
+  if (cached) {
+    res.write(`data: ${JSON.stringify({ type: 'progress', ...cached })}\n\n`);
+  }
+
   // Log-Listener für diesen Run
   const logListener = (logData: any) => {
     if (logData.runId === runId) {
       res.write(`data: ${JSON.stringify(logData)}\n\n`);
+    }
+  };
+
+  /** Strukturierter Fortschritt (aktuelle Suite / Warteschlange) */
+  const progressListener = (progressData: any) => {
+    if (progressData.runId === runId) {
+      res.write(`data: ${JSON.stringify({ type: 'progress', ...progressData })}\n\n`);
     }
   };
 
@@ -252,11 +265,13 @@ app.get('/api/test-logs/:runId/stream', (req, res) => {
 
   // Event-Listener registrieren
   testLogEmitter.on('log', logListener);
+  testLogEmitter.on('progress', progressListener);
   testLogEmitter.on('complete', completeListener);
 
   // Cleanup-Funktion
   const cleanup = () => {
     testLogEmitter.off('log', logListener);
+    testLogEmitter.off('progress', progressListener);
     testLogEmitter.off('complete', completeListener);
     res.end();
   };

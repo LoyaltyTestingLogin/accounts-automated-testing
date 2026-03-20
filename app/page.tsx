@@ -38,6 +38,22 @@ interface TestSuite {
   description: string;
 }
 
+const PATH_PASSWORD_HAPPY = 'tests/login/password-happy-path.spec.ts';
+
+type InfoDialogKind = 'passkey' | 'password-happy' | 'both';
+
+/** Hinweise vor Start: Passkey-Test, Passwort Happy Path (Login Challenge), oder beides bei „Alle Tests“. */
+function getInfoDialogKindForPath(resolvedPath: string): InfoDialogKind | null {
+  const isAll = resolvedPath === 'tests';
+  const norm = resolvedPath.replace(/\\/g, '/');
+  const hasPasskey = isAll || norm.includes('passkey-happy-path');
+  const hasPasswordHappy = isAll || norm.includes('password-happy-path');
+  if (hasPasskey && hasPasswordHappy) return 'both';
+  if (hasPasskey) return 'passkey';
+  if (hasPasswordHappy) return 'password-happy';
+  return null;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [testRuns, setTestRuns] = useState<TestRun[]>([]);
@@ -60,6 +76,9 @@ export default function Dashboard() {
   const [environment, setEnvironment] = useState<'prod' | 'test'>('prod');
   const [environmentLoaded, setEnvironmentLoaded] = useState(false);
   const [cleanupDays, setCleanupDays] = useState<number>(4);
+
+  const [infoDialog, setInfoDialog] = useState<InfoDialogKind | null>(null);
+  const [pendingTestPath, setPendingTestPath] = useState<string | null>(null);
 
   // Lade gespeicherte Umgebung aus localStorage beim ersten Render
   useEffect(() => {
@@ -235,38 +254,25 @@ export default function Dashboard() {
     }
   };
 
-  const runTests = async (testPath?: string) => {
+  /** Start nach Bestätigung im Hinweis-Dialog (oder ohne Dialog). */
+  const performRunTests = async (actualTestPath: string) => {
     if (runningTest) return;
 
     setRunningTest(true);
-    
-    try {
-      // Wenn kein expliziter testPath übergeben wurde, nutze den path aus der ausgewählten Suite
-      let actualTestPath = testPath;
-      if (!actualTestPath) {
-        const selectedSuiteObj = testSuites.find(s => s.id === selectedSuite);
-        actualTestPath = selectedSuiteObj?.path || 'tests';
-      }
 
+    try {
       const response = await axios.post('/api/run-tests', {
         testPath: actualTestPath,
         headed: true,
         environment,
       });
 
-      // Öffne Live-Log in neuem Fenster (links positioniert, 1/3 Breite)
       if (response.data.runId) {
         const logUrl = `/test-runs/${response.data.runId}/live`;
-        
-        // Ermittle Bildschirmbreite und -höhe
         const screenWidth = window.screen.width;
         const screenHeight = window.screen.height;
-        
-        // Log-Fenster nimmt linkes Drittel
         const logWidth = Math.floor(screenWidth / 3);
         const logHeight = screenHeight;
-        
-        // Öffne neues Fenster mit spezifischen Koordinaten (linkes Drittel)
         window.open(
           logUrl,
           'LiveTestLogs',
@@ -275,14 +281,49 @@ export default function Dashboard() {
       } else {
         alert('Tests gestartet! Die Ergebnisse erscheinen in Kürze.');
       }
-      
-      // Sofort neu laden
+
       setTimeout(fetchData, 2000);
     } catch (error) {
       console.error('Fehler beim Starten der Tests:', error);
       alert('Fehler beim Starten der Tests');
     } finally {
       setRunningTest(false);
+    }
+  };
+
+  /**
+   * Zeigt bei Passkey / Passwort Happy Path / „Alle Tests“ einen Hinweis-Dialog;
+   * erst nach „Verstanden …“ wird gestartet.
+   */
+  const requestRunTests = (testPath?: string) => {
+    if (runningTest) return;
+
+    let actualTestPath = testPath;
+    if (!actualTestPath) {
+      const selectedSuiteObj = testSuites.find((s) => s.id === selectedSuite);
+      actualTestPath = selectedSuiteObj?.path || PATH_PASSWORD_HAPPY;
+    }
+
+    const kind = getInfoDialogKindForPath(actualTestPath);
+    if (kind) {
+      setPendingTestPath(actualTestPath);
+      setInfoDialog(kind);
+      return;
+    }
+
+    void performRunTests(actualTestPath);
+  };
+
+  const cancelInfoDialog = () => {
+    setInfoDialog(null);
+    setPendingTestPath(null);
+  };
+
+  const confirmInfoDialog = () => {
+    if (pendingTestPath) {
+      const path = pendingTestPath;
+      cancelInfoDialog();
+      void performRunTests(path);
     }
   };
 
@@ -327,6 +368,67 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Hinweis-Popup vor Passkey / Happy Path / Alle Tests */}
+      {infoDialog && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="test-hint-dialog-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60 cursor-default"
+            aria-label="Schließen"
+            onClick={cancelInfoDialog}
+          />
+          <div className="relative z-[10000] bg-white rounded-xl shadow-2xl border border-gray-200 max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 text-left">
+            <h2 id="test-hint-dialog-title" className="text-lg font-bold text-gray-900 mb-2">
+              Hinweis vor dem Start
+            </h2>
+
+            {(infoDialog === 'passkey' || infoDialog === 'both') && (
+              <section className={infoDialog === 'both' ? 'mb-6 pb-6 border-b border-gray-100' : ''}>
+                <h3 className="text-sm font-semibold text-blue-800 mb-2">Passkey-Test</h3>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Dieser Lauf ist in der Praxis nur auf dem <strong>vorgesehenen Test-Laptop</strong> zuverlässig
+                  grün: Dort entfällt eine zusätzliche <strong>biometrische Abfrage</strong>, und der genutzte{' '}
+                  <strong>Passkey ist auf diesem Gerät registriert</strong>. Auf anderen Rechnern kann der Test
+                  fehlschlagen oder hängen bleiben – das gilt für <strong>TEST- und PROD-Umgebung</strong> gleichermaßen.
+                </p>
+              </section>
+            )}
+
+            {(infoDialog === 'password-happy' || infoDialog === 'both') && (
+              <section>
+                <h3 className="text-sm font-semibold text-blue-800 mb-2">
+                  Passwort Happy Path & Login Challenge
+                </h3>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Der Test enthält die <strong>Login Challenge</strong> (zusätzliche Prüfung nach dem Passwort).
+                  <br />
+                  <strong className="text-gray-800">TEST:</strong> Die Challenge ist dort oft <strong>standardmäßig
+                  aus</strong>. Soll der Lauf auf der Test-Umgebung erfolgreich sein, muss die Login Challenge für{' '}
+                  <strong>check24_sso</strong> (API-Produkt) auf <strong>Test</strong> aktiviert werden.
+                  <br />
+                  <strong className="text-gray-800">PROD:</strong> Die Challenge ist dort in der Regel bereits aktiv –{' '}
+                  <strong>kein zusätzlicher Schritt nötig</strong>.
+                </p>
+              </section>
+            )}
+
+            <div className="mt-6 flex flex-wrap gap-3 justify-end">
+              <button type="button" onClick={cancelInfoDialog} className="btn-secondary">
+                Abbrechen
+              </button>
+              <button type="button" onClick={confirmInfoDialog} className="btn-primary">
+                Verstanden, Test(e) starten
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="mb-8 flex justify-between items-start">
         <div>
@@ -577,7 +679,7 @@ export default function Dashboard() {
                               <button
                                 key={suite.id}
                                 onClick={() => {
-                                  runTests(suite.path);
+                                  requestRunTests(suite.path);
                                   setIsDropdownOpen(false);
                                   setSearchQuery('');
                                   setSelectedSuite(''); // Dropdown zurücksetzen
@@ -660,7 +762,7 @@ export default function Dashboard() {
 
               {/* Button */}
               <button
-                onClick={() => runTests('tests')}
+                onClick={() => requestRunTests('tests')}
                 disabled={runningTest}
                 className="w-full btn-primary bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >

@@ -67,14 +67,6 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     description: 'Account Replace Flow - Ersetzen eines bestehenden Accounts\n\n• Test 1: Account Replace mit E-Mail-Adresse (Erstelle Account → Öffne neuen Browser → Klicke "dieser E-Mail-Adresse" → "trotzdem neues Konto erstellen" → Account ersetzen)\n\n• Test 2: Account Replace mit Mobiltelefonnummer (Erstelle Account mit Phone → Öffne neuen Browser → Klicke "dieser Mobiltelefonnummer" → "trotzdem neues Konto erstellen" → Account ersetzen)',
     testCount: 2,
   },
-  {
-    id: 'misc-slack-notification',
-    name: 'Sonstiges - Slack-Benachrichtigung (skip)',
-    path: 'tests/test-slack-notification.spec.ts',
-    description:
-      'Optional: absichtlich fehlschlagender Test für Slack (derzeit test.skip – wird bei „Alle Tests“ mitgeladen, führt aber keinen aktiven Test aus)',
-    testCount: 0,
-  },
 ];
 
 /**
@@ -147,4 +139,67 @@ export function getTestSuiteCountForPath(testPath?: string): number {
  */
 export function getTotalTestCount(): number {
   return TEST_SUITES.reduce((sum, suite) => sum + suite.testCount, 0);
+}
+
+export interface OrderedSuiteEntry {
+  path: string;
+  name: string;
+}
+
+/**
+ * Sortiert Spec-Pfade wie Playwright bei Verzeichnis-Läufen: lexikographisch nach relativem Pfad.
+ * So stimmen Live-UI und tatsächliche Ausführungsreihenfolge überein.
+ */
+export function sortSpecPathsLikePlaywright(paths: string[]): string[] {
+  return [...paths].sort((a, b) => a.localeCompare(b, 'en'));
+}
+
+function orderedSuitesFromSortedPaths(paths: string[]): OrderedSuiteEntry[] {
+  const sorted = sortSpecPathsLikePlaywright(paths);
+  return sorted.map(path => {
+    const suite = TEST_SUITES.find(s => s.path === path);
+    return suite ? { path: suite.path, name: suite.name } : { path, name: path };
+  });
+}
+
+/**
+ * Explizite Playwright-CLI-Argumente: gleiche Pfade wie in der UI, in Playwright-Reihenfolge.
+ * @returns null = einzelner Pfad / unbekannt → Aufrufer nutzt testPath unverändert
+ */
+export function getPlaywrightCliTestArgsForPath(testPath?: string): string | null {
+  if (testPath === 'tests') {
+    return sortSpecPathsLikePlaywright(TEST_SUITES.map(s => s.path)).join(' ');
+  }
+  if (testPath === 'tests/login') {
+    const paths = TEST_SUITES.filter(s => s.path.startsWith('tests/login/')).map(s => s.path);
+    return sortSpecPathsLikePlaywright(paths).join(' ');
+  }
+  if (testPath === 'tests/registration') {
+    const paths = TEST_SUITES.filter(s => s.path.startsWith('tests/registration/')).map(s => s.path);
+    return sortSpecPathsLikePlaywright(paths).join(' ');
+  }
+  return null;
+}
+
+export function getOrderedSuitesForTestPath(testPath?: string): OrderedSuiteEntry[] {
+  if (!testPath || testPath === 'tests') {
+    return orderedSuitesFromSortedPaths(TEST_SUITES.map(s => s.path));
+  }
+
+  if (testPath === 'tests/login') {
+    const paths = TEST_SUITES.filter(s => s.path.startsWith('tests/login/')).map(s => s.path);
+    return orderedSuitesFromSortedPaths(paths);
+  }
+
+  if (testPath === 'tests/registration') {
+    const paths = TEST_SUITES.filter(s => s.path.startsWith('tests/registration/')).map(s => s.path);
+    return orderedSuitesFromSortedPaths(paths);
+  }
+
+  const exact = TEST_SUITES.find(s => s.path === testPath);
+  if (exact) {
+    return [{ path: exact.path, name: exact.name }];
+  }
+
+  return [];
 }

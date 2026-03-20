@@ -6,12 +6,28 @@ import { join } from 'path';
 import { getDatabase, TestRunInsert } from '../database/schema';
 import { getSlackNotifier } from '../slack/notifier';
 import { EventEmitter } from 'events';
-import { getTestCountForPath, getTestSuiteCountForPath } from '../config/test-suites';
+import { getOrderedSuitesForTestPath, getPlaywrightCliTestArgsForPath, getTestSuiteCountForPath } from '../config/test-suites';
+import { parsePlaywrightTestLine, type ParsedPlaywrightTestLine } from './playwright-line-parser';
 
 const execAsync = promisify(exec);
 
 // Event-Emitter für Live-Logs
 export const testLogEmitter = new EventEmitter();
+
+/** Letzter Fortschritt pro Run (für SSE: Tab verbindet oft erst nach Start). */
+export const lastProgressPayloadByRunId = new Map<
+  number,
+  {
+    runId: number;
+    currentSpecPath: string | null;
+    currentSuiteLabel: string;
+    currentTestTitle: string | null;
+    suitePosition: number;
+    suiteTotal: number;
+    completedSuites: { path: string; name: string }[];
+    upcomingSuites: { path: string; name: string }[];
+  }
+>();
 
 /**
  * Playwright Test Runner
@@ -119,7 +135,7 @@ export class PlaywrightRunner {
       testLogEmitter.emit('log', { runId, message: `📝 Führe aus: ${command}\n`, timestamp: new Date().toISOString() });
 
       // Tests mit Live-Streaming ausführen
-      await this.runTestsWithLiveOutput(command, runId, { headed, environment: env });
+      await this.runTestsWithLiveOutput(command, runId, { headed, environment: env, testPath });
 
       const duration = Date.now() - startTime;
 
@@ -270,7 +286,11 @@ export class PlaywrightRunner {
   /**
    * Führt Tests mit Live-Output aus
    */
-  private runTestsWithLiveOutput(command: string, runId: number, options?: { headed?: boolean; environment?: 'prod' | 'test' }): Promise<void> {
+  private runTestsWithLiveOutput(
+    command: string,
+    runId: number,
+    options?: { headed?: boolean; environment?: 'prod' | 'test'; testPath?: string }
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       // Kommando in Teile aufteilen für spawn
       const [cmd, ...args] = command.split(' ');
@@ -279,7 +299,10 @@ export class PlaywrightRunner {
         cwd: process.cwd(),
         env: { 
           ...process.env, 
-          FORCE_COLOR: '0', // Keine Farb-Codes für saubere Logs
+          FORCE_COLOR: '0', // Weniger ANSI in Logs (Parser strippt trotzdem)
+          // List-Reporter: bei spawn/pipe sonst kein onTestBegin; mit Debug keine TTY-Cursor-Escape-Sequenzen
+          PLAYWRIGHT_FORCE_TTY: '1',
+          PW_TEST_DEBUG_REPORTERS: '1',
           // Browser rechts positionieren wenn headed mode
           BROWSER_POSITION: options?.headed ? 'right' : undefined,
           // Umgebung für Tests
@@ -305,10 +328,79 @@ export class PlaywrightRunner {
       // Track welche Test-Files bereits abgeschlossen sind (für scheduled runs)
       const completedTestFiles = new Set<string>();
 
+      const orderedSuites = getOrderedSuitesForTestPath(options?.testPath);
+      let stdoutLineBuffer = '';
+      let stderrLineBuffer = '';
+      let lastProgressFingerprint = '';
+
+      const emitStructuredProgress = (payload: {
+        currentSpecPath: string | null;
+        currentSuiteLabel: string;
+        currentTestTitle: string | null;
+        suitePosition: number;
+        suiteTotal: number;
+        completedSuites: { path: string; name: string }[];
+        upcomingSuites: { path: string; name: string }[];
+      }) => {
+        const fp = JSON.stringify(payload);
+        if (fp === lastProgressFingerprint) return;
+        lastProgressFingerprint = fp;
+        const full = { runId, ...payload };
+        lastProgressPayloadByRunId.set(runId, full);
+        testLogEmitter.emit('progress', full);
+      };
+
+      const applyParsedLine = (parsed: ParsedPlaywrightTestLine) => {
+        const suiteIdx = orderedSuites.findIndex(s => s.path === parsed.specPath);
+        const suiteName = suiteIdx >= 0 ? orderedSuites[suiteIdx].name : parsed.specPath;
+        const completed =
+          suiteIdx > 0 ? orderedSuites.slice(0, suiteIdx).map(s => ({ path: s.path, name: s.name })) : [];
+        const upcoming = suiteIdx >= 0 ? orderedSuites.slice(suiteIdx + 1).map(s => ({ path: s.path, name: s.name })) : [];
+        const suiteTotal =
+          orderedSuites.length > 0 ? orderedSuites.length : 1;
+        const suitePosition =
+          suiteIdx >= 0 ? suiteIdx + 1 : orderedSuites.length > 0 ? 0 : 1;
+        emitStructuredProgress({
+          currentSpecPath: parsed.specPath,
+          currentSuiteLabel: suiteName,
+          currentTestTitle: parsed.testTitle,
+          suitePosition,
+          suiteTotal,
+          completedSuites: completed,
+          upcomingSuites: upcoming,
+        });
+      };
+
+      const drainLinesForProgress = (raw: string, isStderr: boolean) => {
+        const buf = isStderr ? stderrLineBuffer : stdoutLineBuffer;
+        const combined = buf + raw;
+        const lineParts = combined.split('\n');
+        const nextBuf = lineParts.pop() ?? '';
+        if (isStderr) stderrLineBuffer = nextBuf;
+        else stdoutLineBuffer = nextBuf;
+        for (const line of lineParts) {
+          const parsed = parsePlaywrightTestLine(line);
+          if (!parsed) continue;
+          applyParsedLine(parsed);
+        }
+      };
+
+      emitStructuredProgress({
+        currentSpecPath: null,
+        currentSuiteLabel: 'Playwright startet …',
+        currentTestTitle: null,
+        suitePosition: 0,
+        suiteTotal: orderedSuites.length > 0 ? orderedSuites.length : 0,
+        completedSuites: [],
+        upcomingSuites: [...orderedSuites],
+      });
+
       // STDOUT in Echtzeit streamen
       childProcess.stdout.on('data', (data: Buffer) => {
         const message = data.toString();
         console.log(message);
+
+        drainLinesForProgress(message, false);
         
         // Für scheduled runs: Zähle nur abgeschlossene Test-FILES, nicht einzelne Cases
         if (isScheduledRun) {
@@ -382,10 +474,11 @@ export class PlaywrightRunner {
         });
       });
 
-      // STDERR in Echtzeit streamen
+      // STDERR in Echtzeit streamen (manche Reporter/Tooling schreiben hier)
       childProcess.stderr.on('data', (data: Buffer) => {
         const message = data.toString();
         console.error(message);
+        drainLinesForProgress(message, true);
         testLogEmitter.emit('log', {
           runId,
           message,
@@ -396,6 +489,17 @@ export class PlaywrightRunner {
 
       // Prozess-Ende
       childProcess.on('close', (code) => {
+        if (stdoutLineBuffer.trim()) {
+          const parsed = parsePlaywrightTestLine(stdoutLineBuffer);
+          if (parsed) applyParsedLine(parsed);
+        }
+        if (stderrLineBuffer.trim()) {
+          const parsed = parsePlaywrightTestLine(stderrLineBuffer);
+          if (parsed) applyParsedLine(parsed);
+        }
+
+        lastProgressPayloadByRunId.delete(runId);
+
         // Lösche PID aus Datenbank
         this.db.updateTestRun(runId, { processPid: null });
         console.log(`🗑️  Prozess-PID für Run-ID ${runId} aus DB entfernt`);
@@ -440,7 +544,10 @@ export class PlaywrightRunner {
 
     let cmd = 'npx playwright test';
 
-    if (testPath) {
+    const expandedPaths = getPlaywrightCliTestArgsForPath(testPath);
+    if (expandedPaths !== null) {
+      cmd += ` ${expandedPaths}`;
+    } else if (testPath) {
       cmd += ` ${testPath}`;
     }
 
@@ -452,7 +559,7 @@ export class PlaywrightRunner {
       cmd += ` --headed`;
     }
 
-    // Reporter für JSON-Output
+    // JSON für Ergebnis-Parsing; list liefert Testzeilen (mit PLAYWRIGHT_FORCE_TTY + PW_TEST_DEBUG_REPORTERS auch bei gepipedem stdout brauchbar)
     cmd += ` --reporter=json,list`;
 
     return cmd;
@@ -806,6 +913,7 @@ export class PlaywrightRunner {
         timestamp: new Date().toISOString(),
         type: 'system',
       });
+      lastProgressPayloadByRunId.delete(runId);
       testLogEmitter.emit('complete', { runId });
       
       console.log(`✅ Test ${runId} erfolgreich gestoppt${processKilled ? ' und Prozess gekillt' : ''}`);
