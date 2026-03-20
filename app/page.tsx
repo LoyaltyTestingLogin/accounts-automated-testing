@@ -23,14 +23,6 @@ interface TestRun {
   environment: 'prod' | 'test';
 }
 
-interface Statistics {
-  total: number;
-  passed: number;
-  failed: number;
-  running: number;
-  avgDuration: number;
-}
-
 interface TestSuite {
   id: string;
   name: string;
@@ -57,7 +49,6 @@ function getInfoDialogKindForPath(resolvedPath: string): InfoDialogKind | null {
 export default function Dashboard() {
   const router = useRouter();
   const [testRuns, setTestRuns] = useState<TestRun[]>([]);
-  const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [testSuites, setTestSuites] = useState<TestSuite[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningTest, setRunningTest] = useState(false);
@@ -144,9 +135,8 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [runsRes, statsRes, suitesRes, schedulerRes, intervalRes, cleanupRes] = await Promise.all([
+      const [runsRes, suitesRes, schedulerRes, intervalRes, cleanupRes] = await Promise.all([
         axios.get(`/api/test-runs?limit=20&environment=${environment}`),
-        axios.get(`/api/statistics?environment=${environment}`),
         axios.get('/api/test-suites'),
         axios.get('/api/scheduler/status').catch(() => ({ data: { data: { available: false, isPaused: false } } })),
         axios.get('/api/scheduler/interval').catch(() => ({ data: { data: { intervalMinutes: 15 } } })),
@@ -154,7 +144,6 @@ export default function Dashboard() {
       ]);
 
       setTestRuns(runsRes.data.data || []);
-      setStatistics(statsRes.data.data || null);
       setTestSuites(suitesRes.data.data || []);
       
       // Scheduler Status
@@ -348,12 +337,6 @@ export default function Dashboard() {
     if (!ms) return 'N/A';
     return `${(ms / 1000).toFixed(2)}s`;
   };
-
-  const successRate = statistics 
-    ? (statistics.passed + statistics.failed) > 0 
-      ? ((statistics.passed / (statistics.passed + statistics.failed)) * 100).toFixed(1) 
-      : '0'
-    : '0';
 
   if (loading) {
     return (
@@ -567,33 +550,6 @@ export default function Dashboard() {
         )}
       </header>
 
-      {/* Statistiken */}
-      {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Gesamt Tests (7d)</div>
-            <div className="text-3xl font-bold text-gray-900">{statistics.total}</div>
-          </div>
-          
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Erfolgsquote</div>
-            <div className="text-3xl font-bold text-green-600">{successRate}%</div>
-          </div>
-          
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Fehlgeschlagen</div>
-            <div className="text-3xl font-bold text-red-600">{statistics.failed}</div>
-          </div>
-          
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Ø Dauer</div>
-            <div className="text-3xl font-bold text-blue-600">
-              {formatDuration(statistics.avgDuration)}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Test-Steuerung */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
@@ -610,7 +566,7 @@ export default function Dashboard() {
                   Einzelner Test
                 </h3>
                 <p className="text-sm text-gray-600 mt-1 text-center">
-                  Führt einen ausgewählten Test im Browser aus → <strong>Du kannst zusehen</strong>
+                  Führt einen ausgewählten Test im Browser aus.
                 </p>
               </div>
             </div>
@@ -743,7 +699,7 @@ export default function Dashboard() {
                   Alle Tests
                 </h3>
                 <p className="text-sm text-gray-600 mt-1 text-center">
-                  Führt alle {testSuites.length} Tests <strong>sequenziell nacheinander</strong> aus → <strong>Du kannst zusehen</strong>
+                  Führt alle {testSuites.length} Tests <strong>sequenziell nacheinander</strong> aus.
                 </p>
               </div>
             </div>

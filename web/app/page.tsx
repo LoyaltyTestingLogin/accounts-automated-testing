@@ -18,14 +18,6 @@ interface TestRun {
   slackNotified: boolean;
 }
 
-interface Statistics {
-  total: number;
-  passed: number;
-  failed: number;
-  running: number;
-  avgDuration: number;
-}
-
 interface TestSuite {
   id: string;
   name: string;
@@ -53,7 +45,6 @@ function getInfoDialogKindForPath(resolvedPath: string): InfoDialogKind | null {
 
 export default function Dashboard() {
   const [testRuns, setTestRuns] = useState<TestRun[]>([]);
-  const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [testSuites, setTestSuites] = useState<TestSuite[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningTest, setRunningTest] = useState(false);
@@ -72,14 +63,12 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [runsRes, statsRes, suitesRes] = await Promise.all([
+      const [runsRes, suitesRes] = await Promise.all([
         axios.get('/api/test-runs?limit=20'),
-        axios.get('/api/statistics'),
         axios.get('/api/test-suites'),
       ]);
 
       setTestRuns(runsRes.data.data || []);
-      setStatistics(statsRes.data.data || null);
       setTestSuites(suitesRes.data.data || []);
       setLoading(false);
     } catch (error) {
@@ -163,12 +152,6 @@ export default function Dashboard() {
     return `${(ms / 1000).toFixed(2)}s`;
   };
 
-  const successRate = statistics
-    ? statistics.total > 0
-      ? ((statistics.passed / statistics.total) * 100).toFixed(1)
-      : '0'
-    : '0';
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -248,33 +231,6 @@ export default function Dashboard() {
         <h1 className="text-4xl font-bold text-gray-900 mb-2">CHECK24 Login Testing</h1>
         <p className="text-gray-600">Automatisiertes E2E Testing mit 24/7 Monitoring</p>
       </header>
-
-      {/* Statistiken */}
-      {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Gesamt Tests (7d)</div>
-            <div className="text-3xl font-bold text-gray-900">{statistics.total}</div>
-          </div>
-
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Erfolgsquote</div>
-            <div className="text-3xl font-bold text-green-600">{successRate}%</div>
-          </div>
-
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Fehlgeschlagen</div>
-            <div className="text-3xl font-bold text-red-600">{statistics.failed}</div>
-          </div>
-
-          <div className="card">
-            <div className="text-sm text-gray-600 mb-1">Ø Dauer</div>
-            <div className="text-3xl font-bold text-blue-600">
-              {formatDuration(statistics.avgDuration)}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Test-Steuerung */}
       <div className="card mb-8">
