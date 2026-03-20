@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-hooks';
+import type { Page } from '@playwright/test';
 import { expectLoginSuccess, logout } from '../helpers/auth';
 import { getEmailClient, EmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
@@ -7,6 +8,151 @@ import { enableAutoScreenshots, takeAutoScreenshot, commitScreenshots, disableAu
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+/**
+ * Nach der Geburtsdatum-Challenge (bzw. PLZ-Challenge) im Passwort-Reset kommt der Screen mit
+ * „Passwort ändern“ (a.c24-uli-pwr-pw-link) und „weiter“ (#c24-uli-pwr-login-btn) – nicht direkt nach der TAN.
+ */
+async function clickWeiterNachPasswortResetChallenge(page: Page): Promise<void> {
+  const weiterOhnePwAendern = page.locator('#c24-uli-pwr-login-btn');
+  try {
+    await weiterOhnePwAendern.waitFor({ state: 'visible', timeout: 20000 });
+  } catch {
+    console.log('ℹ️  #c24-uli-pwr-login-btn nicht sichtbar – evtl. direkte Weiterleitung');
+    return;
+  }
+  console.log('➡️  Screen nach Challenge: klicke „weiter“ (#c24-uli-pwr-login-btn)...');
+  await weiterOhnePwAendern.scrollIntoViewIfNeeded();
+  await weiterOhnePwAendern.click();
+  console.log('✅ „weiter“ geklickt (ohne Passwort zu ändern)');
+  await page.waitForTimeout(1200);
+}
+
+/** ULI Passwort-Reset: Geburtsdatum in #cl_birthday_lc (gleiche Eingabe-Strategie wie TEIL 2 / SMS-TAN). */
+async function fillUliGeburtsdatumChallengeField(page: Page): Promise<void> {
+  const birthdayChallengeInput = page.locator('#cl_birthday_lc');
+  await birthdayChallengeInput.waitFor({ state: 'visible', timeout: 10000 });
+  console.log('✅ Geburtsdatum-Challenge-Feld (#cl_birthday_lc)');
+
+  const birthdayRaw = '26042000';
+  console.log('📅 Gebe Geburtsdatum ein: 26.04.2000');
+
+  await birthdayChallengeInput.click({ clickCount: 3 });
+  await page.waitForTimeout(300);
+
+  await birthdayChallengeInput.pressSequentially(birthdayRaw, { delay: 150 });
+  await page.waitForTimeout(1000);
+
+  let birthdayValue = await birthdayChallengeInput.inputValue();
+  console.log(`🔍 Wert im Feld: "${birthdayValue}"`);
+
+  if (birthdayValue !== '26.04.2000') {
+    console.log('⚠️  Versuche alternative Eingabe-Methode...');
+    await birthdayChallengeInput.click();
+    await page.waitForTimeout(200);
+    await birthdayChallengeInput.press('Meta+A');
+    await page.waitForTimeout(200);
+    await birthdayChallengeInput.press('Backspace');
+    await page.waitForTimeout(300);
+    await birthdayChallengeInput.pressSequentially(birthdayRaw, { delay: 150 });
+    await page.waitForTimeout(1000);
+
+    birthdayValue = await birthdayChallengeInput.inputValue();
+    console.log(`🔍 Wert nach alternativer Methode: "${birthdayValue}"`);
+  }
+
+  if (birthdayValue !== '26.04.2000') {
+    throw new Error(`Geburtsdatum-Eingabe fehlgeschlagen: Erwartet "26.04.2000", erhalten "${birthdayValue}"`);
+  }
+
+  console.log('✅ Geburtsdatum korrekt eingegeben');
+}
+
+async function clickUliGeburtsdatumChallengeWeiterFirst(page: Page): Promise<void> {
+  console.log('➡️  Klicke "Weiter" (#c24-uli-lc-bd-btn)...');
+  const weiterButtonChallenge = page.locator('#c24-uli-lc-bd-btn');
+  await weiterButtonChallenge.waitFor({ state: 'visible', timeout: 10000 });
+  await weiterButtonChallenge.scrollIntoViewIfNeeded();
+  await weiterButtonChallenge.click();
+  console.log('✅ "Weiter" geklickt (erster Screen)');
+  await page.waitForTimeout(2000);
+
+  console.log('✅ PLZ/Birthday Challenge erfolgreich - erster Screen abgeschlossen');
+  console.log('📍 Aktuelle URL:', page.url());
+}
+
+async function clickUliGeburtsdatumChallengeWeiterSecondOptional(page: Page): Promise<void> {
+  console.log('➡️  SCHRITT 6b: Zweiter "Weiter" (falls gleicher Button erneut sichtbar)...');
+  const weiterButtonSecond = page.locator('#c24-uli-lc-bd-btn');
+  if (await weiterButtonSecond.isVisible().catch(() => false)) {
+    await weiterButtonSecond.scrollIntoViewIfNeeded();
+    await weiterButtonSecond.click();
+    console.log('✅ Zweiter "Weiter" geklickt');
+    await page.waitForTimeout(800);
+  } else {
+    console.log('ℹ️  Kein zweiter #c24-uli-lc-bd-btn sichtbar – evtl. direkte Weiterleitung');
+  }
+
+  console.log('✅ PLZ/Birthday Challenge vollständig abgeschlossen');
+}
+
+/** ULI PLZ-Challenge nach TAN: Eingabe #cl_zipcode_lc, „Weiter“ #c24-uli-lc-zipcode-btn */
+async function fillUliPlzChallengeField(page: Page, plz: string = '80636'): Promise<void> {
+  const plzInput = page.locator('#cl_zipcode_lc');
+  await plzInput.waitFor({ state: 'visible', timeout: 10000 });
+  console.log('✅ PLZ-Challenge-Feld (#cl_zipcode_lc)');
+
+  await plzInput.click({ clickCount: 3 });
+  await page.waitForTimeout(200);
+  await plzInput.fill(plz);
+  await page.waitForTimeout(400);
+
+  let value = await plzInput.inputValue();
+  console.log(`🔍 Wert im PLZ-Feld: "${value}"`);
+
+  if (value !== plz) {
+    console.log('⚠️  PLZ: alternative Eingabe (Select All + erneut)...');
+    await plzInput.click();
+    await page.waitForTimeout(150);
+    await plzInput.press('Meta+A');
+    await page.waitForTimeout(100);
+    await plzInput.press('Backspace');
+    await page.waitForTimeout(150);
+    await plzInput.pressSequentially(plz, { delay: 80 });
+    await page.waitForTimeout(400);
+    value = await plzInput.inputValue();
+    console.log(`🔍 Wert nach Alternative: "${value}"`);
+  }
+
+  if (value !== plz) {
+    throw new Error(`PLZ-Challenge: erwartet "${plz}", erhalten "${value}"`);
+  }
+  console.log(`✅ PLZ ${plz} eingegeben`);
+}
+
+async function clickUliPlzChallengeWeiterFirst(page: Page): Promise<void> {
+  console.log('➡️  Klicke "Weiter" (#c24-uli-lc-zipcode-btn)...');
+  const btn = page.locator('#c24-uli-lc-zipcode-btn');
+  await btn.waitFor({ state: 'visible', timeout: 10000 });
+  await btn.scrollIntoViewIfNeeded();
+  await btn.click();
+  console.log('✅ "Weiter" nach PLZ-Challenge geklickt (erster Schritt)');
+  await page.waitForTimeout(2000);
+  console.log('📍 Aktuelle URL:', page.url());
+}
+
+async function clickUliPlzChallengeWeiterSecondOptional(page: Page): Promise<void> {
+  console.log('➡️  Zweiter "Weiter" PLZ-Challenge (falls #c24-uli-lc-zipcode-btn erneut sichtbar)...');
+  const btn = page.locator('#c24-uli-lc-zipcode-btn');
+  if (await btn.isVisible().catch(() => false)) {
+    await btn.scrollIntoViewIfNeeded();
+    await btn.click();
+    console.log('✅ Zweiter "Weiter" (#c24-uli-lc-zipcode-btn) geklickt');
+    await page.waitForTimeout(800);
+  } else {
+    console.log('ℹ️  Kein zweiter #c24-uli-lc-zipcode-btn sichtbar');
+  }
+}
 
 /**
  * CHECK24 Login - PLZ/Birthday Challenge Tests
@@ -71,7 +217,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
 
         // Klick auf "Weiter"
         console.log('➡️  Klicke auf "Weiter"-Button...');
-        const weiterButton = registrationPage.getByRole('button', { name: 'Weiter' });
+        const weiterButton = registrationPage.locator('#c24-uli-login-btn');
         await weiterButton.click();
         console.log('✅ "Weiter" wurde geklickt');
         await registrationPage.waitForTimeout(1500);
@@ -126,9 +272,10 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('   ✅ E-Mail eingegeben');
       await registrationPage.waitForTimeout(500);
 
-      // Klick auf "Weiter"
-      console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton2 = registrationPage.getByRole('button', { name: 'Weiter' });
+      // Klick auf "Weiter" nach E-Mail (Registrierungs-Check-Screen)
+      console.log('➡️  Klicke auf "Weiter" (#c24-uli-registercheck-btn)...');
+      const weiterButton2 = registrationPage.locator('#c24-uli-registercheck-btn');
+      await weiterButton2.waitFor({ state: 'visible', timeout: 10000 });
       await weiterButton2.click();
       console.log('✅ "Weiter" wurde geklickt');
       await registrationPage.waitForTimeout(1000);
@@ -162,7 +309,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       await password2.fill('1qay1qay');
       console.log('   ✅ Passwort in zweites Feld eingegeben');
 
-      // Klick auf "Weiter"
+      // Klick auf "Weiter" (Registrierungsformular)
       console.log('➡️  Klicke auf "Weiter"-Button...');
       const weiterButton3 = registrationPage.getByRole('button', { name: 'Weiter' });
       await weiterButton3.click();
@@ -347,11 +494,10 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       await registrationPage.waitForTimeout(2000);
       
       try {
-        const cookieBannerButton = registrationPage.getByText('geht klar', { exact: true });
-        const cookieButtonVisible = await cookieBannerButton.isVisible({ timeout: 2000 }).catch(() => false);
-        if (cookieButtonVisible) {
-          await cookieBannerButton.click();
-          await registrationPage.waitForTimeout(1000);
+        const gehtKlar = registrationPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
+        if (await gehtKlar.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await gehtKlar.click();
+          await registrationPage.waitForTimeout(400);
           console.log('✅ Cookie-Banner geschlossen mit "geht klar"');
         } else {
           console.log('ℹ️  Kein Cookie-Banner mit "geht klar" gefunden');
@@ -360,168 +506,30 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         console.log('ℹ️  Cookie-Banner konnte nicht geschlossen werden oder ist nicht vorhanden');
       }
 
-      // Klick auf "Profil" oben rechts
-      console.log('👤 Suche "Profil" Link/Button...');
+      // Klick auf "Profil" (Kundenbereich-Header)
+      console.log('👤 Klicke "Profil" (c24-customer-hover-wrapper)...');
       console.log(`📍 Aktuelle URL: ${registrationPage.url()}`);
-      
-      const profilSelectors = [
-        'a:has-text("Profil")',
-        'button:has-text("Profil")',
-        'a:has-text("profil")',
-        '[href*="profil"]',
-        '[data-testid*="profil"]',
-        'nav a, nav button', // Alle Links/Buttons in Navigation
-      ];
-      
-      let profilLink = null;
-      for (const selector of profilSelectors) {
-        try {
-          const elements = await registrationPage.locator(selector).all();
-          for (const element of elements) {
-            const isVisible = await element.isVisible().catch(() => false);
-            if (isVisible) {
-              const text = await element.textContent().catch(() => '');
-              if (text && text.toLowerCase().includes('profil')) {
-                profilLink = element;
-                console.log(`✅ "Profil" Link gefunden: "${text.trim()}" (${selector})`);
-                break;
-              }
-            }
-          }
-          if (profilLink) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!profilLink) {
-        console.log('⚠️  "Profil" Link nicht gefunden - liste alle sichtbaren Links/Buttons:');
-        const allLinks = await registrationPage.locator('a, button').all();
-        let count = 0;
-        for (const link of allLinks) {
-          const isVisible = await link.isVisible().catch(() => false);
-          if (isVisible && count < 20) {
-            const text = await link.textContent().catch(() => '');
-            const href = await link.getAttribute('href').catch(() => '');
-            if (text?.trim()) {
-              console.log(`   ${count+1}. "${text.trim()}" (href: ${href || 'none'})`);
-              count++;
-            }
-          }
-        }
-        throw new Error('Konnte "Profil" Link nicht finden');
-      }
-
-      try {
-        await profilLink.click({ timeout: 5000 });
-        console.log('✅ "Profil" geklickt');
-      } catch (e) {
-        console.log('⚠️  Normal-Click fehlgeschlagen, versuche force-click...');
-        await profilLink.click({ force: true });
-        console.log('✅ "Profil" geklickt (force)');
-      }
-      await registrationPage.waitForTimeout(1500);
+      const profilLink = registrationPage.locator('a.c24-customer-hover-wrapper').first();
+      await profilLink.waitFor({ state: 'visible', timeout: 15000 });
+      await profilLink.click({ force: true });
+      console.log('✅ "Profil" geklickt');
+      await registrationPage.waitForTimeout(800);
 
       // Klick auf "Persönliche Daten"
-      console.log('📋 Suche "Persönliche Daten" Link...');
-      console.log(`📍 Aktuelle URL: ${registrationPage.url()}`);
-      
-      const persoenlicheDatenSelectors = [
-        'a:has-text("Persönliche Daten")',
-        'button:has-text("Persönliche Daten")',
-        'a:has-text("persönliche")',
-        'a:has-text("Daten")',
-        '[href*="persoenliche"]',
-        '[href*="personal"]',
-        '[href*="account"]',
-      ];
-      
-      let persoenlicheDatenLink = null;
-      for (const selector of persoenlicheDatenSelectors) {
-        try {
-          const elements = await registrationPage.locator(selector).all();
-          for (const element of elements) {
-            const isVisible = await element.isVisible().catch(() => false);
-            if (isVisible) {
-              const text = await element.textContent().catch(() => '');
-              if (text && (text.toLowerCase().includes('persönliche') || text.toLowerCase().includes('daten'))) {
-                persoenlicheDatenLink = element;
-                console.log(`✅ "Persönliche Daten" Link gefunden: "${text.trim()}" (${selector})`);
-                break;
-              }
-            }
-          }
-          if (persoenlicheDatenLink) break;
-        } catch (e) {
-          continue;
-        }
-      }
+      console.log('📋 Klicke "Persönliche Daten" (href personal-data)...');
+      const persoenlicheDatenLink = registrationPage.locator('a[href*="personal-data"]').first();
+      await persoenlicheDatenLink.waitFor({ state: 'visible', timeout: 15000 });
+      await persoenlicheDatenLink.click({ force: true });
+      console.log('✅ "Persönliche Daten" geklickt');
+      await registrationPage.waitForTimeout(800);
 
-      if (!persoenlicheDatenLink) {
-        console.log('⚠️  "Persönliche Daten" Link nicht gefunden - liste alle sichtbaren Links:');
-        const allLinks = await registrationPage.locator('a, button').all();
-        let count = 0;
-        for (const link of allLinks) {
-          const isVisible = await link.isVisible().catch(() => false);
-          if (isVisible && count < 20) {
-            const text = await link.textContent().catch(() => '');
-            const href = await link.getAttribute('href').catch(() => '');
-            if (text?.trim()) {
-              console.log(`   ${count+1}. "${text.trim()}" (href: ${href || 'none'})`);
-              count++;
-            }
-          }
-        }
-        throw new Error('Konnte "Persönliche Daten" Link nicht finden');
-      }
-
-      try {
-        await persoenlicheDatenLink.click({ timeout: 5000 });
-        console.log('✅ "Persönliche Daten" geklickt');
-      } catch (e) {
-        console.log('⚠️  Normal-Click fehlgeschlagen, versuche force-click...');
-        await persoenlicheDatenLink.click({ force: true });
-        console.log('✅ "Persönliche Daten" geklickt (force)');
-      }
-      await registrationPage.waitForTimeout(1500);
-
-      // Klick auf "Geburtsdatum" links
-      console.log('🎂 Klicke auf "Geburtsdatum"...');
-      const geburtsdatumSelectors = [
-        'a:has-text("Geburtsdatum")',
-        'button:has-text("Geburtsdatum")',
-        '[href*="geburtsdatum"]',
-        '[href*="birthday"]',
-      ];
-      
-      let geburtsdatumLink = null;
-      for (const selector of geburtsdatumSelectors) {
-        try {
-          const element = registrationPage.locator(selector).first();
-          const isVisible = await element.isVisible().catch(() => false);
-          if (isVisible) {
-            geburtsdatumLink = element;
-            console.log(`✅ "Geburtsdatum" Link gefunden mit: ${selector}`);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!geburtsdatumLink) {
-        throw new Error('Konnte "Geburtsdatum" Link nicht finden');
-      }
-
-      try {
-        await geburtsdatumLink.click({ timeout: 5000 });
-        console.log('✅ "Geburtsdatum" geklickt');
-      } catch (e) {
-        console.log('⚠️  Normal-Click fehlgeschlagen, versuche force-click...');
-        await geburtsdatumLink.click({ force: true });
-        console.log('✅ "Geburtsdatum" geklickt (force)');
-      }
-      await registrationPage.waitForTimeout(1500);
+      // Klick auf "Geburtsdatum" (Menü links)
+      console.log('🎂 Klicke "Geburtsdatum" (c24-kb__menu-bar__item__container)...');
+      const geburtsdatumLink = registrationPage.locator('a.c24-kb__menu-bar__item__container[title="Geburtsdatum"]').first();
+      await geburtsdatumLink.waitFor({ state: 'visible', timeout: 15000 });
+      await geburtsdatumLink.click({ force: true });
+      console.log('✅ "Geburtsdatum" geklickt');
+      await registrationPage.waitForTimeout(800);
 
       // Geburtsdatum eingeben
       // Das Feld hat ein maskiertes Format "TT.MM.JJJJ" - die Punkte werden automatisch eingefügt
@@ -724,36 +732,10 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       
       console.log('✅ Geburtsdatum bleibt stabil im Feld!');
 
-      // Klick auf "speichern"
-      console.log('💾 Klicke auf "speichern"...');
-      const speichernSelectors = [
-        'button:has-text("Speichern")',
-        'button:has-text("speichern")',
-        'button[type="submit"]',
-      ];
-      
-      let speichernButton = null;
-      for (const selector of speichernSelectors) {
-        try {
-          const buttons = await registrationPage.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              speichernButton = btn;
-              console.log(`✅ "Speichern" Button gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (speichernButton) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!speichernButton) {
-        throw new Error('Konnte "Speichern" Button nicht finden');
-      }
-
+      // Klick auf "speichern" (Kundenbereich Primary-Button)
+      console.log('💾 Klicke auf "speichern" (c24-kb-button__primary)...');
+      const speichernButton = registrationPage.locator('button.c24-kb-button__primary[type="submit"]').first();
+      await speichernButton.waitFor({ state: 'visible', timeout: 15000 });
       await speichernButton.click();
       console.log('✅ "Speichern" geklickt');
       await registrationPage.waitForTimeout(2000);
@@ -802,122 +784,40 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
 
       // Klick auf "Weiter"
       console.log('➡️  Klicke auf "Weiter"...');
-      const weiterButton = resetPage.getByRole('button', { name: 'Weiter' });
+      const weiterButton = resetPage.locator('#c24-uli-login-btn');
       await weiterButton.click();
       await resetPage.waitForTimeout(1000);
 
-      // SCHRITT 2: Klicke auf "Passwort vergessen?"
+      // SCHRITT 2: Klicke auf "Passwort vergessen?" (Wrapper-Klasse)
       console.log('🔍 SCHRITT 2: Klicke auf "Passwort vergessen?"...');
-      
-      const passwordForgottenSelectors = [
-        'a:has-text("Passwort vergessen?")',
-        'button:has-text("Passwort vergessen?")',
-        'a:has-text("passwort vergessen")',
-        '[href*="forgot"]',
-        '[href*="reset"]',
-      ];
-
-      let passwordForgottenLink = null;
-      for (const selector of passwordForgottenSelectors) {
-        try {
-          const element = resetPage.locator(selector).first();
-          const isVisible = await element.isVisible().catch(() => false);
-          if (isVisible) {
-            passwordForgottenLink = element;
-            console.log(`✅ "Passwort vergessen?" Link gefunden mit: ${selector}`);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!passwordForgottenLink) {
-        throw new Error('Konnte "Passwort vergessen?" Link nicht finden');
-      }
-
+      const passwordForgottenLink = resetPage.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await passwordForgottenLink.waitFor({ state: 'visible', timeout: 10000 });
       await passwordForgottenLink.click();
       console.log('✅ "Passwort vergessen?" geklickt');
       await resetPage.waitForTimeout(2000);
       
       await takeAutoScreenshot(resetPage, 'password-reset-selection-screen');
 
-      // SCHRITT 3: Selection Screen - Wähle Phone/SMS TAN
-      console.log('🔍 SCHRITT 3: Wähle SMS/Phone als Challenge-Methode...');
+      // SCHRITT 3: Selection Screen – SMS (#c24-uli-choose-sms)
+      console.log('🔍 SCHRITT 3: Wähle SMS als Challenge-Methode...');
       console.log(`📍 Aktuelle URL: ${resetPage.url()}`);
-      
-      // Suche nach SMS/Phone Label (klicke auf das Label, nicht den Radio Button)
-      const phoneLabelSelectors = [
-        'label:has-text("SMS")',
-        'label:has-text("Telefon")',
-        'label[for*="sms"]',
-        'label[for*="phone"]',
-      ];
-
-      let phoneLabel = null;
-      for (const selector of phoneLabelSelectors) {
+      const smsRadioReset = resetPage.locator('#c24-uli-choose-sms');
+      if (await smsRadioReset.count() > 0) {
         try {
-          const elements = await resetPage.locator(selector).all();
-          for (const element of elements) {
-            const isVisible = await element.isVisible().catch(() => false);
-            if (isVisible) {
-              phoneLabel = element;
-              console.log(`✅ SMS/Phone Label gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (phoneLabel) break;
-        } catch (e) {
-          continue;
+          await smsRadioReset.click({ timeout: 2000 });
+        } catch {
+          await resetPage.locator('label[for="c24-uli-choose-sms"]').click({ force: true });
         }
-      }
-
-      if (phoneLabel) {
-        await phoneLabel.click();
-        console.log('✅ SMS/Phone-Option ausgewählt');
-        await resetPage.waitForTimeout(500);
+        console.log('✅ SMS-Option ausgewählt');
       } else {
-        console.log('⚠️  Phone/SMS-Option nicht gefunden - versuche fortzufahren');
+        console.log('⚠️  SMS-Radio nicht gefunden - versuche fortzufahren');
       }
-
-      await resetPage.waitForTimeout(1000);
+      await resetPage.waitForTimeout(400);
       await takeAutoScreenshot(resetPage, 'sms-option-ausgewaehlt');
-      
-      // Klick auf "Code senden" oder "Weiter"
-      console.log('➡️  Klicke auf "Code senden"...');
-      
-      const submitButtonSelectors = [
-        'button:has-text("Code senden")',
-        'button:has-text("code senden")',
-        'button:has-text("Senden")',
-        'button:has-text("Weiter")',
-        'button[type="submit"]',
-        'button[type="button"]:has-text("Weiter")',
-      ];
 
-      let submitButton = null;
-      for (const selector of submitButtonSelectors) {
-        try {
-          const buttons = await resetPage.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              const btnText = await btn.textContent().catch(() => '');
-              submitButton = btn;
-              console.log(`✅ Submit-Button gefunden: "${btnText?.trim()}" (${selector})`);
-              break;
-            }
-          }
-          if (submitButton) break;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!submitButton) {
-        throw new Error('Konnte "Code senden" Button nicht finden');
-      }
-
+      console.log('➡️  Klicke "Code senden" (#c24-uli-pwr-choose-btn)...');
+      const submitButton = resetPage.locator('#c24-uli-pwr-choose-btn');
+      await submitButton.waitFor({ state: 'visible', timeout: 10000 });
       await submitButton.click();
       console.log('✅ "Code senden" geklickt');
       await resetPage.waitForTimeout(2000);
@@ -1020,154 +920,15 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('📍 Aktuelle URL:', resetPage.url());
       
       await takeAutoScreenshot(resetPage, 'plz-birthday-challenge-screen-leer');
-      
-      // Suche nach Geburtsdatum-Eingabefeld
-      const birthdayChallengSelectors = [
-        'input[name*="birthday"]',
-        'input[name*="birthdate"]',
-        'input[name*="birth"]',
-        'input[placeholder*="Geburtsdatum"]',
-        'input[placeholder*="TT.MM.JJJJ"]',
-        'input[type="text"]',
-      ];
-      
-      let birthdayChallengeInput = null;
-      for (const selector of birthdayChallengSelectors) {
-        try {
-          const inputs = await resetPage.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              birthdayChallengeInput = input;
-              console.log(`✅ Geburtsdatum-Eingabefeld gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (birthdayChallengeInput) break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (!birthdayChallengeInput) {
-        console.log('⚠️  Geburtsdatum-Eingabefeld nicht gefunden!');
-        console.log('📄 Body Text (erste 500 Zeichen):');
-        const bodyText = await resetPage.locator('body').innerText();
-        console.log(bodyText.substring(0, 500));
-        throw new Error('Konnte Geburtsdatum-Eingabefeld nicht finden');
-      }
-      
-      // Geburtsdatum eingeben (gleiche Strategie wie in Teil 1)
-      const birthdayRaw = '26042000';
-      console.log('📅 Gebe Geburtsdatum ein: 26.04.2000');
-      
-      await birthdayChallengeInput.click({ clickCount: 3 });
-      await resetPage.waitForTimeout(300);
-      
-      await birthdayChallengeInput.pressSequentially(birthdayRaw, { delay: 150 });
-      await resetPage.waitForTimeout(1000);
-      
-      let birthdayValue = await birthdayChallengeInput.inputValue();
-      console.log(`🔍 Wert im Feld: "${birthdayValue}"`);
-      
-      if (birthdayValue !== '26.04.2000') {
-        console.log('⚠️  Versuche alternative Eingabe-Methode...');
-        await birthdayChallengeInput.click();
-        await resetPage.waitForTimeout(200);
-        await birthdayChallengeInput.press('Meta+A');
-        await resetPage.waitForTimeout(200);
-        await birthdayChallengeInput.press('Backspace');
-        await resetPage.waitForTimeout(300);
-        await birthdayChallengeInput.pressSequentially(birthdayRaw, { delay: 150 });
-        await resetPage.waitForTimeout(1000);
-        
-        birthdayValue = await birthdayChallengeInput.inputValue();
-        console.log(`🔍 Wert nach alternativer Methode: "${birthdayValue}"`);
-      }
-      
-      if (birthdayValue !== '26.04.2000') {
-        throw new Error(`Geburtsdatum-Eingabe fehlgeschlagen: Erwartet "26.04.2000", erhalten "${birthdayValue}"`);
-      }
-      
-      console.log('✅ Geburtsdatum korrekt eingegeben');
+
+      await fillUliGeburtsdatumChallengeField(resetPage);
       await takeAutoScreenshot(resetPage, 'geburtsdatum-eingegeben');
-      
-      // Klick auf "Weiter"
-      console.log('➡️  Klicke auf "Weiter"...');
-      const weiterButtonChallengSelectors = [
-        'button:has-text("Weiter")',
-        'button:has-text("weiter")',
-        'button[type="submit"]',
-        'input[type="submit"]',
-      ];
-      
-      let weiterButtonChallenge = null;
-      for (const selector of weiterButtonChallengSelectors) {
-        try {
-          const buttons = await resetPage.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterButtonChallenge = btn;
-              console.log(`✅ "Weiter" Button gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterButtonChallenge) break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (!weiterButtonChallenge) {
-        throw new Error('Konnte "Weiter" Button nicht finden');
-      }
-      
-      await weiterButtonChallenge.click();
-      console.log('✅ "Weiter" geklickt (erster Screen)');
-      await resetPage.waitForTimeout(2000);
-      
-      console.log('✅ PLZ/Birthday Challenge erfolgreich - erster Screen abgeschlossen');
-      console.log('📍 Aktuelle URL:', resetPage.url());
+
+      await clickUliGeburtsdatumChallengeWeiterFirst(resetPage);
       await takeAutoScreenshot(resetPage, 'nach-erstem-weiter');
-      
-      // SCHRITT 6b: Zweiter "Weiter"-Button auf dem nächsten Screen
-      console.log('➡️  SCHRITT 6b: Klicke auf "Weiter" auf dem zweiten Screen...');
-      
-      const weiterButtonSecondSelectors = [
-        'button:has-text("Weiter")',
-        'button:has-text("weiter")',
-        'button[type="submit"]',
-        'input[type="submit"]',
-      ];
-      
-      let weiterButtonSecond = null;
-      for (const selector of weiterButtonSecondSelectors) {
-        try {
-          const buttons = await resetPage.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterButtonSecond = btn;
-              console.log(`✅ Zweiter "Weiter" Button gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterButtonSecond) break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (!weiterButtonSecond) {
-        console.log('⚠️  Zweiter "Weiter" Button nicht gefunden - möglicherweise direkte Weiterleitung');
-      } else {
-        await weiterButtonSecond.click();
-        console.log('✅ Zweiter "Weiter" geklickt');
-        await resetPage.waitForTimeout(1000);
-      }
-      
-      console.log('✅ PLZ/Birthday Challenge vollständig abgeschlossen');
+
+      await clickUliGeburtsdatumChallengeWeiterSecondOptional(resetPage);
+      await clickWeiterNachPasswortResetChallenge(resetPage);
       
       // SCHRITT 7: Auf Callback-Seite warten und c24session Cookie prüfen
       console.log('⏳ SCHRITT 7: Warte auf Weiterleitung zur Callback-Seite...');
@@ -1230,77 +991,32 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         const phoneInput3 = resetPage3.locator('#cl_login');
         await phoneInput3.fill(phoneNumber);
         
-        const weiterBtn3 = resetPage3.getByRole('button', { name: 'Weiter' });
+        const weiterBtn3 = resetPage3.locator('#c24-uli-login-btn');
         await weiterBtn3.click();
         await resetPage3.waitForTimeout(1000);
         
         console.log('🔍 Klicke auf "Passwort vergessen?"...');
-        const passwordForgottenLink3 = resetPage3.locator('a:has-text("Passwort vergessen?")').first();
+        const passwordForgottenLink3 = resetPage3.locator('.c24-uli-cl-pwreset-wrapper').first();
+        await passwordForgottenLink3.waitFor({ state: 'visible', timeout: 10000 });
         await passwordForgottenLink3.click();
         await resetPage3.waitForTimeout(2000);
-        
-        console.log('🔍 Wähle E-Mail TAN...');
-        const emailLabelSelectors3 = [
-          'label:has-text("E-Mail")',
-          'label:has-text("email")',
-          'label[for*="email"]',
-        ];
-        
-        let emailLabel3Found = false;
-        for (const selector of emailLabelSelectors3) {
+
+        console.log('🔍 Wähle E-Mail TAN (#c24-uli-choose-email)...');
+        const emailRadio3 = resetPage3.locator('#c24-uli-choose-email');
+        if (await emailRadio3.count() > 0) {
           try {
-            const labels = await resetPage3.locator(selector).all();
-            for (const label of labels) {
-              const isVisible = await label.isVisible().catch(() => false);
-              if (isVisible) {
-                await label.click();
-                console.log(`✅ E-Mail-Option ausgewählt mit: ${selector}`);
-                emailLabel3Found = true;
-                break;
-              }
-            }
-            if (emailLabel3Found) break;
-          } catch (e) {
-            continue;
+            await emailRadio3.click({ timeout: 2000 });
+          } catch {
+            await resetPage3.locator('label[for="c24-uli-choose-email"]').click({ force: true });
           }
+          console.log('✅ E-Mail-Option ausgewählt');
+        } else {
+          console.log('ℹ️  E-Mail-Radio nicht gefunden – evtl. bereits vorausgewählt');
         }
-        
-        if (!emailLabel3Found) {
-          console.log('ℹ️  E-Mail-Option möglicherweise bereits vorausgewählt');
-        }
-        
-        await resetPage3.waitForTimeout(1000);
-        
-        const submitBtnSelectors3 = [
-          'button:has-text("Code senden")',
-          'button:has-text("code senden")',
-          'button:has-text("Senden")',
-          'button:has-text("Weiter")',
-          'button[type="submit"]',
-        ];
-        
-        let submitBtn3 = null;
-        for (const selector of submitBtnSelectors3) {
-          try {
-            const buttons = await resetPage3.locator(selector).all();
-            for (const btn of buttons) {
-              const isVisible = await btn.isVisible().catch(() => false);
-              if (isVisible) {
-                submitBtn3 = btn;
-                console.log(`✅ Submit-Button gefunden mit: ${selector}`);
-                break;
-              }
-            }
-            if (submitBtn3) break;
-          } catch (e) {
-            continue;
-          }
-        }
-        
-        if (!submitBtn3) {
-          throw new Error('Konnte "Code senden" Button nicht finden');
-        }
-        
+        await resetPage3.waitForTimeout(400);
+
+        const submitBtn3 = resetPage3.locator('#c24-uli-pwr-choose-btn');
+        await submitBtn3.waitFor({ state: 'visible', timeout: 10000 });
         await submitBtn3.click();
         console.log('✅ "Code senden" geklickt');
         await resetPage3.waitForTimeout(2000);
@@ -1344,87 +1060,17 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         console.log('✅ E-Mail-TAN eingegeben');
         await resetPage3.waitForTimeout(2000);
         
-        console.log('🎂 Gebe Geburtsdatum ein...');
-        
-        const birthdaySelectors3 = [
-          'input[name*="birthday"]',
-          'input[name*="birthdate"]',
-          'input[name*="birth"]',
-          'input[placeholder*="Geburtsdatum"]',
-          'input[placeholder*="TT.MM.JJJJ"]',
-        ];
-        
-        let birthdayInput3 = null;
-        for (const selector of birthdaySelectors3) {
-          const inputs = await resetPage3.locator(selector).all();
-          for (const input of inputs) {
-            const isVisible = await input.isVisible().catch(() => false);
-            if (isVisible) {
-              birthdayInput3 = input;
-              console.log(`✅ Geburtsdatum-Feld gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (birthdayInput3) break;
-        }
-        
-        if (!birthdayInput3) throw new Error('Konnte Geburtsdatum-Feld nicht finden');
-        
-        await birthdayInput3.click({ clickCount: 3 });
-        await resetPage3.waitForTimeout(300);
-        await birthdayInput3.pressSequentially('26042000', { delay: 150 });
-        await resetPage3.waitForTimeout(1000);
-        console.log('✅ Geburtsdatum eingegeben');
-        
-        const weiterSelectors3 = [
-          'button:has-text("Weiter")',
-          'button:has-text("weiter")',
-          'button[type="submit"]',
-          'input[type="submit"]',
-        ];
-        
-        let weiterBtn3a = null;
-        for (const selector of weiterSelectors3) {
-          const buttons = await resetPage3.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterBtn3a = btn;
-              console.log(`✅ Erster "Weiter" gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterBtn3a) break;
-        }
-        
-        if (!weiterBtn3a) throw new Error('Konnte ersten "Weiter" Button nicht finden');
-        
-        await weiterBtn3a.click();
-        console.log('✅ Erster "Weiter" geklickt');
+        // Geburtsdatum-Challenge: gleiche Logik wie TEIL 2 (SMS-TAN + Passwort-Reset)
+        console.log('🎂 SCHRITT 6: Gebe Geburtsdatum für PLZ/Birthday Challenge ein...');
+        console.log('📍 Aktuelle URL:', resetPage3.url());
+
+        await fillUliGeburtsdatumChallengeField(resetPage3);
+
+        await clickUliGeburtsdatumChallengeWeiterFirst(resetPage3);
+
+        await clickUliGeburtsdatumChallengeWeiterSecondOptional(resetPage3);
+        await clickWeiterNachPasswortResetChallenge(resetPage3);
         await resetPage3.waitForTimeout(2000);
-        
-        let weiterBtn3b = null;
-        for (const selector of weiterSelectors3) {
-          const buttons = await resetPage3.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              weiterBtn3b = btn;
-              console.log(`✅ Zweiter "Weiter" gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (weiterBtn3b) break;
-        }
-        
-        if (!weiterBtn3b) {
-          console.log('⚠️  Zweiter "Weiter" Button nicht gefunden - möglicherweise direkte Weiterleitung');
-        } else {
-          await weiterBtn3b.click();
-          console.log('✅ Zweiter "Weiter" geklickt');
-        }
-        
-        await resetPage3.waitForTimeout(3000);
         
         const cookies3 = await resetPage3.context().cookies();
         const c24Cookie3 = cookies3.find(c => c.name === 'c24session');
@@ -1456,13 +1102,13 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('📱 SCHRITT 1: Gebe Phone-Nummer ein:', phoneNumber);
       const phoneInputOtpSms = otpSmsPage.locator('#cl_login');
       await phoneInputOtpSms.fill(phoneNumber);
-      const weiterBtnOtpSms = otpSmsPage.getByRole('button', { name: 'Weiter' });
+      const weiterBtnOtpSms = otpSmsPage.locator('#c24-uli-login-btn');
       await weiterBtnOtpSms.click();
       await otpSmsPage.waitForTimeout(1000);
       
       // SCHRITT 2: Klick auf "Mit Einmalcode anmelden"
       console.log('🔍 SCHRITT 2: Klicke auf "Mit Einmalcode anmelden"...');
-      const einmalcodeButtonSms = otpSmsPage.getByText('Mit Einmalcode anmelden');
+      const einmalcodeButtonSms = otpSmsPage.locator('.c24-uli-trigger-otp-button').first();
       await einmalcodeButtonSms.waitFor({ state: 'visible', timeout: 10000 });
       await einmalcodeButtonSms.click();
       console.log('✅ "Mit Einmalcode anmelden" geklickt');
@@ -1504,7 +1150,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       }
       
       // "Code senden" klicken
-      const codeSendenBtnOtpSms = otpSmsPage.getByRole('button', { name: 'Code senden' });
+      const codeSendenBtnOtpSms = otpSmsPage.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenBtnOtpSms.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenBtnOtpSms.click();
       console.log('✅ "Code senden" geklickt');
       await otpSmsPage.waitForTimeout(1000);
@@ -1611,31 +1258,14 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
           console.log('   ℹ️  Kein Passkey Collector gefunden (bereits geschlossen oder nicht vorhanden)');
         }
         
-        // SCHRITT 7: Geburtsdatum-Challenge
+        // SCHRITT 7: Geburtsdatum-Challenge (gleiche Helper wie Passwort-Reset TEIL 2)
         console.log('🎂 SCHRITT 7: Gebe Geburtsdatum für Challenge ein...');
         console.log('📍 Aktuelle URL:', otpSmsPage.url());
-        
-        const birthdayInputOtpSms = otpSmsPage.locator('input[name*="birthday"]').first();
-        await birthdayInputOtpSms.waitFor({ state: 'visible', timeout: 10000 });
-        await birthdayInputOtpSms.fill('26.04.2000');
-        console.log('✅ Geburtsdatum eingegeben');
-        
-        const weiterBtn1OtpSms = otpSmsPage.getByRole('button', { name: 'Weiter' });
-        await weiterBtn1OtpSms.click();
-        console.log('✅ Erster "Weiter" geklickt');
-        await otpSmsPage.waitForTimeout(1000);
-        
-        // Zweiter "Weiter" Button (optional - manchmal gibt es einen zweiten Screen)
-        try {
-          const weiterBtn2OtpSms = otpSmsPage.getByRole('button', { name: 'Weiter' });
-          await weiterBtn2OtpSms.waitFor({ state: 'visible', timeout: 3000 });
-          await weiterBtn2OtpSms.click();
-          console.log('✅ Zweiter "Weiter" geklickt');
-          await otpSmsPage.waitForTimeout(1000);
-        } catch (e) {
-          console.log('   ℹ️  Kein zweiter "Weiter"-Button (direkte Weiterleitung)');
-        }
-        
+
+        await fillUliGeburtsdatumChallengeField(otpSmsPage);
+        await clickUliGeburtsdatumChallengeWeiterFirst(otpSmsPage);
+        await clickUliGeburtsdatumChallengeWeiterSecondOptional(otpSmsPage);
+
         await otpSmsPage.waitForTimeout(3000);
         
         // SCHRITT 8: c24session Cookie prüfen
@@ -1678,13 +1308,13 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('📱 SCHRITT 1: Gebe Phone-Nummer ein:', phoneNumber);
       const phoneInputOtpEmail = otpEmailPage.locator('#cl_login');
       await phoneInputOtpEmail.fill(phoneNumber);
-      const weiterBtnOtpEmail = otpEmailPage.getByRole('button', { name: 'Weiter' });
+      const weiterBtnOtpEmail = otpEmailPage.locator('#c24-uli-login-btn');
       await weiterBtnOtpEmail.click();
       await otpEmailPage.waitForTimeout(1000);
       
       // SCHRITT 2: Klick auf "Mit Einmalcode anmelden"
       console.log('🔍 SCHRITT 2: Klicke auf "Mit Einmalcode anmelden"...');
-      const einmalcodeButtonEmail = otpEmailPage.getByText('Mit Einmalcode anmelden');
+      const einmalcodeButtonEmail = otpEmailPage.locator('.c24-uli-trigger-otp-button').first();
       await einmalcodeButtonEmail.waitFor({ state: 'visible', timeout: 10000 });
       await einmalcodeButtonEmail.click();
       console.log('✅ "Mit Einmalcode anmelden" geklickt');
@@ -1734,7 +1364,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         }
         
         // "Code senden" klicken
-        const codeSendenBtnOtpEmail = otpEmailPage.getByRole('button', { name: 'Code senden' });
+        const codeSendenBtnOtpEmail = otpEmailPage.locator('#c24-uli-pwr-choose-btn');
+        await codeSendenBtnOtpEmail.waitFor({ state: 'visible', timeout: 10000 });
         await codeSendenBtnOtpEmail.click();
         console.log('✅ "Code senden" geklickt');
         await otpEmailPage.waitForTimeout(1000);
@@ -1805,31 +1436,14 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
           console.log('✅ E-Mail-TAN eingegeben und Enter gedrückt');
           await otpEmailPage.waitForTimeout(2000);
           
-          // SCHRITT 6: Geburtsdatum-Challenge (kein Passkey Collector beim zweiten Login)
+          // SCHRITT 6: Geburtsdatum-Challenge (gleiche Helper wie Passwort-Reset TEIL 2)
           console.log('🎂 SCHRITT 6: Gebe Geburtsdatum für Challenge ein...');
           console.log('📍 Aktuelle URL:', otpEmailPage.url());
-          
-          const birthdayInputOtpEmail = otpEmailPage.locator('input[name*="birthday"]').first();
-          await birthdayInputOtpEmail.waitFor({ state: 'visible', timeout: 10000 });
-          await birthdayInputOtpEmail.fill('26.04.2000');
-          console.log('✅ Geburtsdatum eingegeben');
-          
-          const weiterBtn1OtpEmail = otpEmailPage.getByRole('button', { name: 'Weiter' });
-          await weiterBtn1OtpEmail.click();
-          console.log('✅ Erster "Weiter" geklickt');
-          await otpEmailPage.waitForTimeout(1000);
-          
-          // Zweiter "Weiter" Button (optional - manchmal gibt es einen zweiten Screen)
-          try {
-            const weiterBtn2OtpEmail = otpEmailPage.getByRole('button', { name: 'Weiter' });
-            await weiterBtn2OtpEmail.waitFor({ state: 'visible', timeout: 3000 });
-            await weiterBtn2OtpEmail.click();
-            console.log('✅ Zweiter "Weiter" geklickt');
-            await otpEmailPage.waitForTimeout(1000);
-          } catch (e) {
-            console.log('   ℹ️  Kein zweiter "Weiter"-Button (direkte Weiterleitung)');
-          }
-          
+
+          await fillUliGeburtsdatumChallengeField(otpEmailPage);
+          await clickUliGeburtsdatumChallengeWeiterFirst(otpEmailPage);
+          await clickUliGeburtsdatumChallengeWeiterSecondOptional(otpEmailPage);
+
           await otpEmailPage.waitForTimeout(3000);
           
         } catch (error) {
@@ -1864,26 +1478,25 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       // Cookie-Banner schließen (falls vorhanden)
       console.log('   Prüfe auf Cookie-Banner...');
       try {
-        const cookieBannerButton = otpEmailPage.getByText('geht klar', { exact: true });
-        await cookieBannerButton.waitFor({ state: 'visible', timeout: 3000 });
-        await cookieBannerButton.click();
-        await otpEmailPage.waitForTimeout(1000);
-        console.log('   ✅ Cookie-Banner geschlossen');
+        const cookieBannerButton = otpEmailPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
+        if (await cookieBannerButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await cookieBannerButton.click();
+          await otpEmailPage.waitForTimeout(400);
+          console.log('   ✅ Cookie-Banner geschlossen');
+        }
       } catch (e) {
         console.log('   ℹ️  Kein Cookie-Banner gefunden');
       }
-      
-      // Klick auf "Profil"
-      console.log('   Klicke auf "Profil"...');
-      const profilLink = otpEmailPage.getByRole('link', { name: 'Profil' });
+
+      console.log('   Klicke auf "Profil" (c24-customer-hover-wrapper)...');
+      const profilLink = otpEmailPage.locator('a.c24-customer-hover-wrapper').first();
       await profilLink.waitFor({ state: 'visible', timeout: 10000 });
       await profilLink.click({ force: true });
       console.log('   ✅ "Profil" geklickt');
       await otpEmailPage.waitForTimeout(1000);
 
-      // Klick auf "Anmelden & Sicherheit" (erster Link im Profil-Menü)
-      console.log('   Klicke auf "Anmelden & Sicherheit"...');
-      const anmeldenSicherheitLink = otpEmailPage.getByRole('link', { name: 'Anmelden & Sicherheit' }).first();
+      console.log('   Klicke auf "Anmelden & Sicherheit" (href settings/overview)...');
+      const anmeldenSicherheitLink = otpEmailPage.locator('a[href*="/settings/overview"]').first();
       await anmeldenSicherheitLink.waitFor({ state: 'visible', timeout: 10000 });
       await anmeldenSicherheitLink.click({ force: true });
       console.log('   ✅ "Anmelden & Sicherheit" geklickt');
@@ -1911,9 +1524,9 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         console.log('   ✅ PROD Environment - URL sollte korrekt sein');
       }
 
-      // Klick auf "Kundenkonto löschen"
+      // Klick auf "Kundenkonto löschen" (Link in SubHeadline)
       console.log('   Klicke auf "Kundenkonto löschen"...');
-      const kundenkontoLoeschenLink = otpEmailPage.getByText('Kundenkonto löschen');
+      const kundenkontoLoeschenLink = otpEmailPage.locator('.c24-acs__settings__overview-page__subHeadline a').filter({ hasText: 'Kundenkonto löschen' }).first();
       await kundenkontoLoeschenLink.waitFor({ state: 'visible', timeout: 10000 });
       await kundenkontoLoeschenLink.click();
       console.log('   ✅ "Kundenkonto löschen" geklickt');
@@ -1927,9 +1540,9 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('   ✅ Checkbox gesetzt');
       await otpEmailPage.waitForTimeout(500);
 
-      // Klick auf "entfernen" Button
+      // Klick auf "entfernen" (Primary ACS-Button)
       console.log('   Klicke auf "entfernen"-Button...');
-      const entfernenButton = otpEmailPage.getByRole('button', { name: 'entfernen', exact: true });
+      const entfernenButton = otpEmailPage.locator('button.c24-acs-button__primary').first();
       await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
       await entfernenButton.click();
       console.log('   ✅ "entfernen" geklickt');
@@ -1993,7 +1606,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         await registrationPage.waitForTimeout(500);
 
         console.log('➡️  Klicke auf "Weiter"-Button...');
-        const weiterButton = registrationPage.getByRole('button', { name: 'Weiter' });
+        const weiterButton = registrationPage.locator('#c24-uli-login-btn');
         await weiterButton.click();
         console.log('✅ "Weiter" wurde geklickt');
         await registrationPage.waitForTimeout(1500);
@@ -2045,8 +1658,9 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('   ✅ E-Mail eingegeben');
       await registrationPage.waitForTimeout(500);
 
-      console.log('➡️  Klicke auf "Weiter"-Button...');
-      const weiterButton2 = registrationPage.getByRole('button', { name: 'Weiter' });
+      console.log('➡️  Klicke auf "Weiter" (#c24-uli-registercheck-btn)...');
+      const weiterButton2 = registrationPage.locator('#c24-uli-registercheck-btn');
+      await weiterButton2.waitFor({ state: 'visible', timeout: 10000 });
       await weiterButton2.click();
       console.log('✅ "Weiter" wurde geklickt');
       await registrationPage.waitForTimeout(1000);
@@ -2270,106 +1884,72 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       
       console.log('🍪 Prüfe auf Cookie-Banner...');
       try {
-        const cookieBanner = registrationPage.getByText('geht klar', { exact: true });
-        await cookieBanner.waitFor({ state: 'visible', timeout: 3000 });
-        await cookieBanner.click();
-        await registrationPage.waitForTimeout(1000);
-        console.log('✅ Cookie-Banner geschlossen mit "geht klar"');
+        const cookieBanner = registrationPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
+        if (await cookieBanner.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await cookieBanner.click();
+          await registrationPage.waitForTimeout(400);
+          console.log('✅ Cookie-Banner geschlossen mit "geht klar"');
+        }
       } catch (e) {
         console.log('   ℹ️  Kein Cookie-Banner gefunden');
       }
-      
-      console.log('👤 Suche "Profil" Link/Button...');
+
+      console.log('👤 Klicke "Profil" (c24-customer-hover-wrapper)...');
       console.log(`📍 Aktuelle URL: ${registrationPage.url()}`);
-      
-      const profilSelectors = [
-        'a:has-text("Profil")',
-        'button:has-text("Profil")',
-        '[data-testid*="profile"]',
-        '[data-tid*="profile"]'
-      ];
-      
-      let profilLink = null;
-      for (const selector of profilSelectors) {
-        try {
-          const link = registrationPage.locator(selector).first();
-          await link.waitFor({ state: 'visible', timeout: 3000 });
-          profilLink = link;
-          console.log(`✅ "Profil" Link gefunden: "${await link.textContent()}" (${selector})`);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (!profilLink) {
-        throw new Error('Profil-Link nicht gefunden');
-      }
-      
-      await profilLink.click({ force: true });
+      const profilLinkPlz = registrationPage.locator('a.c24-customer-hover-wrapper').first();
+      await profilLinkPlz.waitFor({ state: 'visible', timeout: 15000 });
+      await profilLinkPlz.click({ force: true });
       console.log('✅ "Profil" geklickt');
-      await registrationPage.waitForTimeout(1000);
-      
-      console.log('📋 Suche "Persönliche Daten" Link...');
-      console.log(`📍 Aktuelle URL: ${registrationPage.url()}`);
-      
-      const persDataSelectors = [
-        'a:has-text("Persönliche Daten")',
-        'button:has-text("Persönliche Daten")'
-      ];
-      
-      let persDataLink = null;
-      for (const selector of persDataSelectors) {
-        try {
-          const link = registrationPage.locator(selector).first();
-          await link.waitFor({ state: 'visible', timeout: 3000 });
-          persDataLink = link;
-          console.log(`✅ "Persönliche Daten" Link gefunden: "${await link.textContent()}" (${selector})`);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (!persDataLink) {
-        throw new Error('Persönliche Daten Link nicht gefunden');
-      }
-      
+      await registrationPage.waitForTimeout(800);
+
+      console.log('📋 Klicke "Persönliche Daten" (a[href*="personal-data.html"])...');
+      const persDataLink = registrationPage.locator('a[href*="user/account/personal-data.html"]').first();
+      await persDataLink.waitFor({ state: 'visible', timeout: 15000 });
+      await persDataLink.scrollIntoViewIfNeeded();
       await persDataLink.click({ force: true });
       console.log('✅ "Persönliche Daten" geklickt');
-      await registrationPage.waitForTimeout(1000);
-      
-      console.log('🏠 Klicke auf "Adresse"...');
-      const adresseLink = registrationPage.locator('a:has-text("Adresse")').first();
-      await adresseLink.waitFor({ state: 'visible', timeout: 10000 });
+      await registrationPage.waitForTimeout(800);
+
+      console.log('🏠 Klicke auf "Adresse" (a.c24-kb__menu-bar__item__container[title="Adresse"])...');
+      const adresseLink = registrationPage
+        .locator('a.c24-kb__menu-bar__item__container[title="Adresse"][href*="address.html"]')
+        .first();
+      await adresseLink.waitFor({ state: 'visible', timeout: 15000 });
+      await adresseLink.scrollIntoViewIfNeeded();
       await adresseLink.click({ force: true });
       console.log('✅ "Adresse" geklickt');
       await registrationPage.waitForTimeout(1000);
-      
-      console.log('📍 Suche PLZ-Eingabefeld...');
+
+      console.log('📍 Suche PLZ-Eingabefeld (input[name="zipcode"].c24-kb-text-field__input)...');
       console.log(`📍 Aktuelle URL: ${registrationPage.url()}`);
-      
-      const plzInput = registrationPage.locator('input[name*="zip"], input[name*="plz"], input[placeholder*="PLZ"]').first();
-      await plzInput.waitFor({ state: 'visible', timeout: 10000 });
+
+      const plzInput = registrationPage
+        .locator('input.text-field__input.c24-kb-text-field__input[name="zipcode"]')
+        .first();
+      await plzInput.waitFor({ state: 'visible', timeout: 15000 });
       console.log('✅ PLZ-Feld gefunden');
-      
+
       console.log('📍 Gebe PLZ ein: 80636');
       await plzInput.click({ clickCount: 3 });
       await plzInput.fill('80636');
       await registrationPage.waitForTimeout(500);
-      
+
       const plzValue = await plzInput.inputValue();
       console.log(`🔍 Wert im Feld: "${plzValue}"`);
-      
+
       if (plzValue === '80636') {
         console.log('✅ PLZ korrekt eingegeben!');
       } else {
         throw new Error(`PLZ nicht korrekt: erwartet "80636", gefunden "${plzValue}"`);
       }
-      
-      console.log('💾 Klicke auf "speichern"...');
-      const speichernButton = registrationPage.locator('button:has-text("Speichern"), button:has-text("speichern")').first();
-      await speichernButton.waitFor({ state: 'visible', timeout: 10000 });
+
+      console.log('💾 Klicke auf "speichern" (button.c24-kb-button__primary[type="submit"])...');
+      const speichernButton = registrationPage
+        .locator('button.c24-kb-button.c24-kb__button-area__button.c24-kb-button__primary[type="submit"]')
+        .filter({ hasText: /speichern/i })
+        .first();
+      await speichernButton.waitFor({ state: 'visible', timeout: 15000 });
+      await speichernButton.scrollIntoViewIfNeeded();
       await speichernButton.click();
       console.log('✅ "Speichern" geklickt');
       await registrationPage.waitForTimeout(2000);
@@ -2396,24 +1976,28 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('📱 SCHRITT 1: Gebe Phone-Nummer ein:', phoneNumber);
       const phoneInputReset = resetPage.locator('#cl_login');
       await phoneInputReset.fill(phoneNumber);
-      const weiterBtnReset = resetPage.getByRole('button', { name: 'Weiter' });
+      const weiterBtnReset = resetPage.locator('#c24-uli-login-btn');
       await weiterBtnReset.click();
       await resetPage.waitForTimeout(1000);
       
       console.log('🔍 SCHRITT 2: Klicke auf "Passwort vergessen?"...');
-      const passwortVergessenLink = resetPage.locator('a:has-text("Passwort vergessen?")').first();
+      const passwortVergessenLink = resetPage.locator('.c24-uli-cl-pwreset-wrapper').first();
       await passwortVergessenLink.waitFor({ state: 'visible', timeout: 10000 });
       await passwortVergessenLink.click();
       console.log('✅ "Passwort vergessen?" geklickt');
       await resetPage.waitForTimeout(1000);
-      
-      console.log('🔍 SCHRITT 3: Wähle SMS/Phone als Challenge-Methode...');
-      const smsLabel = resetPage.locator('label').filter({ hasText: 'SMS' }).first();
-      await smsLabel.waitFor({ state: 'visible', timeout: 10000 });
-      await smsLabel.click();
+
+      console.log('🔍 SCHRITT 3: Wähle SMS (#c24-uli-choose-sms)...');
+      const smsRadioPlz = resetPage.locator('#c24-uli-choose-sms');
+      try {
+        await smsRadioPlz.click({ timeout: 3000 });
+      } catch {
+        await resetPage.locator('label[for="c24-uli-choose-sms"]').click({ force: true });
+      }
       console.log('✅ SMS-Option ausgewählt');
-      
-      const codeSendenBtn = resetPage.getByRole('button', { name: 'Code senden' });
+
+      const codeSendenBtn = resetPage.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenBtn.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenBtn.click();
       console.log('✅ "Code senden" geklickt');
       await resetPage.waitForTimeout(1000);
@@ -2493,21 +2077,14 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         console.log('✅ SMS-TAN eingegeben');
         await resetPage.waitForTimeout(2000);
         
-        console.log('📍 SCHRITT 6: Gebe PLZ für Challenge ein...');
-        const plzInput = resetPage.locator('input[name*="zip"], input[name*="plz"], input[placeholder*="PLZ"]').first();
-        await plzInput.waitFor({ state: 'visible', timeout: 10000 });
-        await plzInput.fill('80636');
-        console.log('✅ PLZ eingegeben');
-        
-        const weiterBtn1 = resetPage.getByRole('button', { name: 'Weiter' });
-        await weiterBtn1.click();
-        console.log('✅ Erster "Weiter" geklickt');
+        console.log('📍 SCHRITT 6: Gebe PLZ für ULI-Challenge ein (#cl_zipcode_lc)...');
+        await fillUliPlzChallengeField(resetPage, '80636');
+
+        await clickUliPlzChallengeWeiterFirst(resetPage);
+        await clickUliPlzChallengeWeiterSecondOptional(resetPage);
         await resetPage.waitForTimeout(1000);
-        
-        const weiterBtn2 = resetPage.getByRole('button', { name: 'Weiter' });
-        await weiterBtn2.click();
-        console.log('✅ Zweiter "Weiter" geklickt');
-        await resetPage.waitForTimeout(3000);
+        await clickWeiterNachPasswortResetChallenge(resetPage);
+        await resetPage.waitForTimeout(2000);
         
         const cookies = await resetPage.context().cookies();
         const c24Cookie = cookies.find(c => c.name === 'c24session');
@@ -2548,77 +2125,32 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       const phoneInput3 = resetPage3.locator('#cl_login');
       await phoneInput3.fill(phoneNumber);
       
-      const weiterBtn3 = resetPage3.getByRole('button', { name: 'Weiter' });
+      const weiterBtn3 = resetPage3.locator('#c24-uli-login-btn');
       await weiterBtn3.click();
       await resetPage3.waitForTimeout(1000);
       
       console.log('🔍 Klicke auf "Passwort vergessen?"...');
-      const passwordForgottenLink3 = resetPage3.locator('a:has-text("Passwort vergessen?")').first();
+      const passwordForgottenLink3 = resetPage3.locator('.c24-uli-cl-pwreset-wrapper').first();
+      await passwordForgottenLink3.waitFor({ state: 'visible', timeout: 10000 });
       await passwordForgottenLink3.click();
       await resetPage3.waitForTimeout(2000);
-      
-      console.log('🔍 Wähle E-Mail TAN...');
-      const emailLabelSelectors3 = [
-        'label:has-text("E-Mail")',
-        'label:has-text("email")',
-        'label[for*="email"]',
-      ];
-      
-      let emailLabel3Found = false;
-      for (const selector of emailLabelSelectors3) {
+
+      console.log('🔍 Wähle E-Mail TAN (#c24-uli-choose-email)...');
+      const emailRadioPlz3b = resetPage3.locator('#c24-uli-choose-email');
+      if (await emailRadioPlz3b.count() > 0) {
         try {
-          const labels = await resetPage3.locator(selector).all();
-          for (const label of labels) {
-            const isVisible = await label.isVisible().catch(() => false);
-            if (isVisible) {
-              await label.click();
-              console.log(`✅ E-Mail-Option ausgewählt mit: ${selector}`);
-              emailLabel3Found = true;
-              break;
-            }
-          }
-          if (emailLabel3Found) break;
-        } catch (e) {
-          continue;
+          await emailRadioPlz3b.click({ timeout: 2000 });
+        } catch {
+          await resetPage3.locator('label[for="c24-uli-choose-email"]').click({ force: true });
         }
+        console.log('✅ E-Mail-Option ausgewählt');
+      } else {
+        console.log('ℹ️  E-Mail-Radio nicht gefunden – evtl. vorausgewählt');
       }
-      
-      if (!emailLabel3Found) {
-        console.log('ℹ️  E-Mail-Option möglicherweise bereits vorausgewählt');
-      }
-      
-      await resetPage3.waitForTimeout(1000);
-      
-      const submitBtnSelectors3 = [
-        'button:has-text("Code senden")',
-        'button:has-text("code senden")',
-        'button:has-text("Senden")',
-        'button:has-text("Weiter")',
-        'button[type="submit"]',
-      ];
-      
-      let submitBtn3 = null;
-      for (const selector of submitBtnSelectors3) {
-        try {
-          const buttons = await resetPage3.locator(selector).all();
-          for (const btn of buttons) {
-            const isVisible = await btn.isVisible().catch(() => false);
-            if (isVisible) {
-              submitBtn3 = btn;
-              console.log(`✅ Submit-Button gefunden mit: ${selector}`);
-              break;
-            }
-          }
-          if (submitBtn3) break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (!submitBtn3) {
-        throw new Error('Submit-Button (Code senden) nicht gefunden');
-      }
-      
+      await resetPage3.waitForTimeout(400);
+
+      const submitBtn3 = resetPage3.locator('#c24-uli-pwr-choose-btn');
+      await submitBtn3.waitFor({ state: 'visible', timeout: 10000 });
       await submitBtn3.click();
       console.log('✅ "Code senden" geklickt');
       await resetPage3.waitForTimeout(1000);
@@ -2673,21 +2205,14 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         console.log('✅ E-Mail-TAN eingegeben');
         await resetPage3.waitForTimeout(2000);
         
-        console.log('📍 Gebe PLZ ein...');
-        const plzInput3 = resetPage3.locator('input[name*="zip"], input[name*="plz"], input[placeholder*="PLZ"]').first();
-        await plzInput3.waitFor({ state: 'visible', timeout: 10000 });
-        await plzInput3.fill('80636');
-        console.log('✅ PLZ eingegeben');
-        
-        const weiterBtn1_3 = resetPage3.getByRole('button', { name: 'Weiter' });
-        await weiterBtn1_3.click();
-        console.log('✅ Erster "Weiter" geklickt');
+        console.log('📍 Gebe PLZ für ULI-Challenge ein (#cl_zipcode_lc)...');
+        await fillUliPlzChallengeField(resetPage3, '80636');
+
+        await clickUliPlzChallengeWeiterFirst(resetPage3);
+        await clickUliPlzChallengeWeiterSecondOptional(resetPage3);
         await resetPage3.waitForTimeout(1000);
-        
-        const weiterBtn2_3 = resetPage3.getByRole('button', { name: 'Weiter' });
-        await weiterBtn2_3.click();
-        console.log('✅ Zweiter "Weiter" geklickt');
-        await resetPage3.waitForTimeout(3000);
+        await clickWeiterNachPasswortResetChallenge(resetPage3);
+        await resetPage3.waitForTimeout(2000);
         
         const cookies3 = await resetPage3.context().cookies();
         const c24Cookie3 = cookies3.find(c => c.name === 'c24session');
@@ -2727,12 +2252,12 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('📱 SCHRITT 1: Gebe Phone-Nummer ein:', phoneNumber);
       const phoneInputOtpSms = otpSmsPage.locator('#cl_login');
       await phoneInputOtpSms.fill(phoneNumber);
-      const weiterBtnOtpSms = otpSmsPage.getByRole('button', { name: 'Weiter' });
+      const weiterBtnOtpSms = otpSmsPage.locator('#c24-uli-login-btn');
       await weiterBtnOtpSms.click();
       await otpSmsPage.waitForTimeout(1000);
       
       console.log('🔍 SCHRITT 2: Klicke auf "Mit Einmalcode anmelden"...');
-      const einmalcodeButtonSms = otpSmsPage.getByText('Mit Einmalcode anmelden');
+      const einmalcodeButtonSms = otpSmsPage.locator('.c24-uli-trigger-otp-button').first();
       await einmalcodeButtonSms.waitFor({ state: 'visible', timeout: 10000 });
       await einmalcodeButtonSms.click();
       console.log('✅ "Mit Einmalcode anmelden" geklickt');
@@ -2769,7 +2294,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
         console.log('ℹ️  Kein OTP Selection Screen erkannt - überspringe Auswahl');
       }
       
-      const codeSendenBtnOtpSms = otpSmsPage.getByRole('button', { name: 'Code senden' });
+      const codeSendenBtnOtpSms = otpSmsPage.locator('#c24-uli-pwr-choose-btn');
+      await codeSendenBtnOtpSms.waitFor({ state: 'visible', timeout: 10000 });
       await codeSendenBtnOtpSms.click();
       console.log('✅ "Code senden" geklickt');
       await otpSmsPage.waitForTimeout(1000);
@@ -2873,29 +2399,13 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
           console.log('   ℹ️  Kein Passkey Collector gefunden');
         }
         
-        console.log('📍 SCHRITT 7: Gebe PLZ für Challenge ein...');
+        console.log('📍 SCHRITT 7: Gebe PLZ für ULI-Challenge ein (#cl_zipcode_lc)...');
         console.log('📍 Aktuelle URL:', otpSmsPage.url());
-        
-        const plzInputOtpSms = otpSmsPage.locator('input[name*="zip"], input[name*="plz"], input[placeholder*="PLZ"]').first();
-        await plzInputOtpSms.waitFor({ state: 'visible', timeout: 10000 });
-        await plzInputOtpSms.fill('80636');
-        console.log('✅ PLZ eingegeben');
-        
-        const weiterBtn1OtpSms = otpSmsPage.getByRole('button', { name: 'Weiter' });
-        await weiterBtn1OtpSms.click();
-        console.log('✅ Erster "Weiter" geklickt');
-        await otpSmsPage.waitForTimeout(1000);
-        
-        try {
-          const weiterBtn2OtpSms = otpSmsPage.getByRole('button', { name: 'Weiter' });
-          await weiterBtn2OtpSms.waitFor({ state: 'visible', timeout: 3000 });
-          await weiterBtn2OtpSms.click();
-          console.log('✅ Zweiter "Weiter" geklickt');
-          await otpSmsPage.waitForTimeout(1000);
-        } catch (e) {
-          console.log('   ℹ️  Kein zweiter "Weiter"-Button (direkte Weiterleitung)');
-        }
-        
+
+        await fillUliPlzChallengeField(otpSmsPage, '80636');
+        await clickUliPlzChallengeWeiterFirst(otpSmsPage);
+        await clickUliPlzChallengeWeiterSecondOptional(otpSmsPage);
+
         await otpSmsPage.waitForTimeout(3000);
         
         const cookiesOtpSms = await otpSmsPage.context().cookies();
@@ -2936,12 +2446,12 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('📱 SCHRITT 1: Gebe Phone-Nummer ein:', phoneNumber);
       const phoneInputOtpEmail = otpEmailPage.locator('#cl_login');
       await phoneInputOtpEmail.fill(phoneNumber);
-      const weiterBtnOtpEmail = otpEmailPage.getByRole('button', { name: 'Weiter' });
+      const weiterBtnOtpEmail = otpEmailPage.locator('#c24-uli-login-btn');
       await weiterBtnOtpEmail.click();
       await otpEmailPage.waitForTimeout(1000);
       
       console.log('🔍 SCHRITT 2: Klicke auf "Mit Einmalcode anmelden"...');
-      const einmalcodeButtonEmail = otpEmailPage.getByText('Mit Einmalcode anmelden');
+      const einmalcodeButtonEmail = otpEmailPage.locator('.c24-uli-trigger-otp-button').first();
       await einmalcodeButtonEmail.waitFor({ state: 'visible', timeout: 10000 });
       await einmalcodeButtonEmail.click();
       console.log('✅ "Mit Einmalcode anmelden" geklickt');
@@ -2985,7 +2495,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
           console.log('ℹ️  Kein OTP Selection Screen erkannt - überspringe Auswahl');
         }
         
-        const codeSendenBtnOtpEmail = otpEmailPage.getByRole('button', { name: 'Code senden' });
+        const codeSendenBtnOtpEmail = otpEmailPage.locator('#c24-uli-pwr-choose-btn');
+        await codeSendenBtnOtpEmail.waitFor({ state: 'visible', timeout: 10000 });
         await codeSendenBtnOtpEmail.click();
         console.log('✅ "Code senden" geklickt');
         await otpEmailPage.waitForTimeout(1000);
@@ -3054,28 +2565,12 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
           console.log('✅ E-Mail-TAN eingegeben und Enter gedrückt');
           await otpEmailPage.waitForTimeout(2000);
           
-          console.log('📍 SCHRITT 6: Gebe PLZ für Challenge ein...');
+          console.log('📍 SCHRITT 6: Gebe PLZ für ULI-Challenge ein (#cl_zipcode_lc)...');
           console.log('📍 Aktuelle URL:', otpEmailPage.url());
-          
-          const plzInputOtpEmail = otpEmailPage.locator('input[name*="zip"], input[name*="plz"], input[placeholder*="PLZ"]').first();
-          await plzInputOtpEmail.waitFor({ state: 'visible', timeout: 10000 });
-          await plzInputOtpEmail.fill('80636');
-          console.log('✅ PLZ eingegeben');
-          
-          const weiterBtn1OtpEmail = otpEmailPage.getByRole('button', { name: 'Weiter' });
-          await weiterBtn1OtpEmail.click();
-          console.log('✅ Erster "Weiter" geklickt');
-          await otpEmailPage.waitForTimeout(1000);
-          
-          try {
-            const weiterBtn2OtpEmail = otpEmailPage.getByRole('button', { name: 'Weiter' });
-            await weiterBtn2OtpEmail.waitFor({ state: 'visible', timeout: 3000 });
-            await weiterBtn2OtpEmail.click();
-            console.log('✅ Zweiter "Weiter" geklickt');
-            await otpEmailPage.waitForTimeout(1000);
-          } catch (e) {
-            console.log('   ℹ️  Kein zweiter "Weiter"-Button (direkte Weiterleitung)');
-          }
+
+          await fillUliPlzChallengeField(otpEmailPage, '80636');
+          await clickUliPlzChallengeWeiterFirst(otpEmailPage);
+          await clickUliPlzChallengeWeiterSecondOptional(otpEmailPage);
           
           await otpEmailPage.waitForTimeout(3000);
           
@@ -3109,24 +2604,25 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       
       console.log('   Prüfe auf Cookie-Banner...');
       try {
-        const cookieBannerButton = otpEmailPage.getByText('geht klar', { exact: true });
-        await cookieBannerButton.waitFor({ state: 'visible', timeout: 3000 });
-        await cookieBannerButton.click();
-        await otpEmailPage.waitForTimeout(1000);
-        console.log('   ✅ Cookie-Banner geschlossen');
+        const cookieBannerButton = otpEmailPage.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
+        if (await cookieBannerButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await cookieBannerButton.click();
+          await otpEmailPage.waitForTimeout(400);
+          console.log('   ✅ Cookie-Banner geschlossen');
+        }
       } catch (e) {
         console.log('   ℹ️  Kein Cookie-Banner gefunden');
       }
-      
+
       console.log('   Klicke auf "Profil"...');
-      const profilLink = otpEmailPage.getByRole('link', { name: 'Profil' });
+      const profilLink = otpEmailPage.locator('a.c24-customer-hover-wrapper').first();
       await profilLink.waitFor({ state: 'visible', timeout: 10000 });
       await profilLink.click({ force: true });
       console.log('   ✅ "Profil" geklickt');
       await otpEmailPage.waitForTimeout(1000);
 
-      console.log('   Klicke auf "Anmelden & Sicherheit"...');
-      const anmeldenSicherheitLink = otpEmailPage.getByRole('link', { name: 'Anmelden & Sicherheit' }).first();
+      console.log('   Klicke auf "Anmelden & Sicherheit" (href settings/overview)...');
+      const anmeldenSicherheitLink = otpEmailPage.locator('a[href*="/settings/overview"]').first();
       await anmeldenSicherheitLink.waitFor({ state: 'visible', timeout: 10000 });
       await anmeldenSicherheitLink.click({ force: true });
       console.log('   ✅ "Anmelden & Sicherheit" geklickt');
@@ -3155,7 +2651,7 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       }
 
       console.log('   Klicke auf "Kundenkonto löschen"...');
-      const kundenkontoLoeschenLink = otpEmailPage.getByText('Kundenkonto löschen');
+      const kundenkontoLoeschenLink = otpEmailPage.locator('.c24-acs__settings__overview-page__subHeadline a').filter({ hasText: 'Kundenkonto löschen' }).first();
       await kundenkontoLoeschenLink.waitFor({ state: 'visible', timeout: 10000 });
       await kundenkontoLoeschenLink.click();
       console.log('   ✅ "Kundenkonto löschen" geklickt');
@@ -3168,8 +2664,8 @@ test.describe('CHECK24 Login - PLZ/Birthday Challenge', () => {
       console.log('   ✅ Checkbox gesetzt');
       await otpEmailPage.waitForTimeout(500);
 
-      console.log('   Klicke auf "entfernen"-Button...');
-      const entfernenButton = otpEmailPage.getByRole('button', { name: 'entfernen', exact: true });
+      console.log('   Klicke auf "entfernen"-Button (c24-acs-button__primary)...');
+      const entfernenButton = otpEmailPage.locator('button.c24-acs-button__primary').first();
       await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
       await entfernenButton.click();
       console.log('   ✅ "entfernen" geklickt');
