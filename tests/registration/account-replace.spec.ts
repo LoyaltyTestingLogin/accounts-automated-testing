@@ -1,11 +1,71 @@
 import { test, expect } from '../fixtures/test-hooks';
+import type { Page } from '@playwright/test';
 import { expectLoginSuccess } from '../helpers/auth';
 import { getEmailClient } from '../helpers/email';
 import { sendEmailTimeoutWarning } from '../helpers/slack';
-import { getLoginUrl, getKundenbereichUrl } from '../helpers/environment';
+import { getLoginUrl, getKundenbereichUrl, getEnvironment } from '../helpers/environment';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+/** Cookie „geht klar“ – wie plz-birthday-challenge / auth-Flows */
+async function closeCookieGehtKlarIfVisible(page: Page): Promise<void> {
+  try {
+    const cookieBannerButton = page.locator('a.c24-cookie-consent-button').filter({ hasText: /^geht klar$/i }).first();
+    if (await cookieBannerButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await cookieBannerButton.click();
+      await page.waitForTimeout(400);
+    }
+  } catch {
+    /* kein Banner */
+  }
+}
+
+/**
+ * Kundenbereich: Profil → Anmelden & Sicherheit → Konto löschen (wie plz-birthday-challenge.spec.ts)
+ */
+async function deleteKontoViaSettingsOverview(page: Page): Promise<void> {
+  await closeCookieGehtKlarIfVisible(page);
+
+  const profilLink = page.locator('a.c24-customer-hover-wrapper').first();
+  await profilLink.waitFor({ state: 'visible', timeout: 10000 });
+  await profilLink.click({ force: true });
+  await page.waitForTimeout(1000);
+
+  const anmeldenSicherheitLink = page.locator('a[href*="/settings/overview"]').first();
+  await anmeldenSicherheitLink.waitFor({ state: 'visible', timeout: 10000 });
+  await anmeldenSicherheitLink.click({ force: true });
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1000);
+
+  const currentUrl = page.url();
+  const environment = getEnvironment();
+  if (environment === 'test') {
+    if (currentUrl.includes('accounts.check24.com') && !currentUrl.includes('accounts.check24-test.com')) {
+      await page.goto('https://accounts.check24-test.com/settings/overview');
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
+    }
+  }
+
+  const kundenkontoLoeschenLink = page
+    .locator('.c24-acs__settings__overview-page__subHeadline a')
+    .filter({ hasText: 'Kundenkonto löschen' })
+    .first();
+  await kundenkontoLoeschenLink.waitFor({ state: 'visible', timeout: 10000 });
+  await kundenkontoLoeschenLink.click();
+  await page.waitForTimeout(1500);
+
+  const checkbox = page.locator('input[name="terms"][type="checkbox"]');
+  await checkbox.waitFor({ state: 'visible', timeout: 10000 });
+  await checkbox.check();
+  await page.waitForTimeout(500);
+
+  const entfernenButton = page.locator('button.c24-acs-button__primary').first();
+  await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
+  await entfernenButton.click();
+  await page.waitForTimeout(1000);
+}
 
 /**
  * CHECK24 Registrierung - Account Replace Tests
@@ -40,7 +100,8 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await emailInput.fill(email);
       await page1.waitForTimeout(500);
 
-      const weiterButton = page1.getByRole('button', { name: 'Weiter' });
+      // Weiter: Login/Registrierung nach E-Mail (#cl_login) → gleicher ULI-Submit wie andere Login-Tests
+      const weiterButton = page1.locator('#c24-uli-login-btn');
       await weiterButton.click();
       await page1.waitForTimeout(1000);
 
@@ -60,7 +121,10 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await password2.waitFor({ state: 'visible', timeout: 10000 });
       await password2.fill('1qay1qay');
 
-      const weiterButton2 = page1.getByRole('button', { name: 'Weiter' });
+      // Weiter: Registrierungsformular (Vorname/Nachname/Passwort) → vor E-Mail-TAN
+      const weiterButton2 = page1.locator('#c24-uli-register-btn');
+      await weiterButton2.waitFor({ state: 'visible', timeout: 10000 });
+      await weiterButton2.scrollIntoViewIfNeeded();
       await weiterButton2.click();
       await page1.waitForTimeout(1000);
 
@@ -143,19 +207,13 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await emailInput2.fill(email);
       await page2.waitForTimeout(500);
 
-      const weiterButton3 = page2.getByRole('button', { name: 'Weiter' });
+      // Weiter: erneut E-Mail eingeben (Account existiert) → Hinweis „gleiche E-Mail“
+      const weiterButton3 = page2.locator('#c24-uli-login-btn');
       await weiterButton3.click();
       await page2.waitForLoadState('networkidle');
       await page2.waitForTimeout(1000);
 
-      try {
-        const cookieBannerButton = page2.getByText('geht klar', { exact: true });
-        await cookieBannerButton.waitFor({ state: 'visible', timeout: 3000 });
-        await cookieBannerButton.click();
-        await page2.waitForTimeout(1000);
-      } catch (e) {
-        // Kein Cookie-Banner
-      }
+      await closeCookieGehtKlarIfVisible(page2);
 
       let emailLink = null;
       try {
@@ -179,7 +237,7 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await page2.waitForLoadState('networkidle');
       await page2.waitForTimeout(1000);
 
-      const trotzdemButton = page2.getByRole('button', { name: /trotzdem neues Konto erstellen/i });
+      const trotzdemButton = page2.locator('#c24-uli-renew-start-btn');
       await trotzdemButton.waitFor({ state: 'visible', timeout: 10000 });
       await trotzdemButton.click();
       await page2.waitForLoadState('networkidle');
@@ -240,7 +298,8 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await page2.locator('#cl_pw_renew_repeat').fill('1qay1qay', { force: true });
       await page2.waitForTimeout(500);
 
-      const speichernButton = page2.getByRole('button', { name: /speichern und weiter|weiter/i });
+      const speichernButton = page2.locator('#c24-uli-renew-pw-btn');
+      await speichernButton.waitFor({ state: 'visible', timeout: 10000 });
       await speichernButton.click();
       
       await page2.waitForLoadState('networkidle', { timeout: 30000 });
@@ -277,39 +336,9 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       console.log('✅ Account Replace erfolgreich - Login bestätigt');
 
       await page2.waitForTimeout(2000);
-      
-      try {
-        const cookieBannerButton = page2.getByText('geht klar', { exact: true });
-        const cookieButtonVisible = await cookieBannerButton.isVisible({ timeout: 2000 }).catch(() => false);
-        if (cookieButtonVisible) {
-          await cookieBannerButton.click();
-          await page2.waitForTimeout(1000);
-        }
-      } catch (e) {
-        // Kein Cookie-Banner
-      }
-      
-      const anmeldenLink = page2.getByRole('link', { name: 'Anmelden & Sicherheit' });
-      await anmeldenLink.waitFor({ state: 'visible', timeout: 10000 });
-      await anmeldenLink.click({ force: true });
-      await page2.waitForLoadState('networkidle');
-      await page2.waitForTimeout(1000);
-      
-      const kundenkontoLoeschenLink = page2.getByText('Kundenkonto löschen');
-      await kundenkontoLoeschenLink.waitFor({ state: 'visible', timeout: 10000 });
-      await kundenkontoLoeschenLink.click();
-      await page2.waitForTimeout(1500);
-      
-      const checkbox = page2.locator('input[name="terms"][type="checkbox"]');
-      await checkbox.waitFor({ state: 'visible', timeout: 10000 });
-      await checkbox.check();
-      await page2.waitForTimeout(500);
-      
-      const entfernenButton = page2.getByRole('button', { name: 'entfernen', exact: true });
-      await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
-      await entfernenButton.click();
-      await page2.waitForTimeout(1000);
-      
+
+      await deleteKontoViaSettingsOverview(page2);
+
       console.log('✅ Account gelöscht\n');
       
     } finally {
@@ -345,7 +374,8 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await phoneInput.fill(phoneNumber);
       await page1.waitForTimeout(500);
 
-      const weiterButton1 = page1.getByRole('button', { name: 'Weiter' });
+      // Weiter: nach Telefonnummer (#cl_login)
+      const weiterButton1 = page1.locator('#c24-uli-login-btn');
       await weiterButton1.click();
       await page1.waitForTimeout(1000);
 
@@ -359,7 +389,8 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await emailInput.fill(email);
       await page1.waitForTimeout(500);
 
-      const weiterButton2 = page1.getByRole('button', { name: 'Weiter' });
+      // Weiter: nach E-Mail-Registrierungscheck (#cl_email_registercheck)
+      const weiterButton2 = page1.locator('#c24-uli-registercheck-btn');
       await weiterButton2.click();
       await page1.waitForTimeout(1000);
       
@@ -379,7 +410,10 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await password2.waitFor({ state: 'visible', timeout: 10000 });
       await password2.fill('1qay1qay');
 
-      const weiterButton3 = page1.getByRole('button', { name: 'Weiter' });
+      // Weiter: Registrierungsformular (Vorname/Nachname/Passwort) → vor E-Mail-TAN
+      const weiterButton3 = page1.locator('#c24-uli-register-btn');
+      await weiterButton3.waitFor({ state: 'visible', timeout: 10000 });
+      await weiterButton3.scrollIntoViewIfNeeded();
       await weiterButton3.click();
       await page1.waitForTimeout(1000);
 
@@ -511,25 +545,20 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await phoneInput2.fill(phoneNumber);
       await page2.waitForTimeout(500);
 
-      const weiterButton = page2.getByRole('button', { name: 'Weiter' });
+      // Weiter: nach Telefonnummer – gleiche Nummer, Account existiert
+      const weiterButton = page2.locator('#c24-uli-login-btn');
       await weiterButton.click();
       await page2.waitForTimeout(1000);
 
-      try {
-        const cookieBannerButton = page2.getByText('geht klar', { exact: true });
-        await cookieBannerButton.waitFor({ state: 'visible', timeout: 3000 });
-        await cookieBannerButton.click();
-        await page2.waitForTimeout(1000);
-      } catch (e) {
-        // Kein Cookie-Banner
-      }
+      await closeCookieGehtKlarIfVisible(page2);
 
       const phoneLink = page2.locator('[data-tid="register-with-same-phone"]');
       await phoneLink.waitFor({ state: 'attached', timeout: 10000 });
       await phoneLink.evaluate((el: any) => el.click());
       await page2.waitForTimeout(1000);
 
-      const trotzdemButton = page2.getByRole('button', { name: /trotzdem neues konto erstellen/i });
+      const trotzdemButton = page2.locator('#c24-uli-renew-start-btn');
+      await trotzdemButton.waitFor({ state: 'visible', timeout: 10000 });
       await trotzdemButton.click();
       await page2.waitForLoadState('networkidle', { timeout: 30000 });
       await page2.waitForTimeout(1000);
@@ -590,7 +619,8 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       await page2.locator('#cl_pw_renew_repeat').fill('1qay1qay', { force: true });
       await page2.waitForTimeout(500);
 
-      const speichernButton = page2.getByRole('button', { name: /speichern und weiter|weiter/i });
+      const speichernButton = page2.locator('#c24-uli-renew-pw-btn');
+      await speichernButton.waitFor({ state: 'visible', timeout: 10000 });
       await speichernButton.click();
       
       await page2.waitForLoadState('networkidle', { timeout: 30000 });
@@ -623,39 +653,9 @@ test.describe('CHECK24 Registrierung - Account Replace', () => {
       console.log('✅ Account Replace erfolgreich - Login bestätigt');
 
       await page2.waitForTimeout(2000);
-      
-      try {
-        const cookieBannerButton = page2.getByText('geht klar', { exact: true });
-        const cookieButtonVisible = await cookieBannerButton.isVisible({ timeout: 2000 }).catch(() => false);
-        if (cookieButtonVisible) {
-          await cookieBannerButton.click();
-          await page2.waitForTimeout(1000);
-        }
-      } catch (e) {
-        // Kein Cookie-Banner
-      }
-      
-      const anmeldenLink = page2.getByRole('link', { name: 'Anmelden & Sicherheit' });
-      await anmeldenLink.waitFor({ state: 'visible', timeout: 10000 });
-      await anmeldenLink.click({ force: true });
-      await page2.waitForLoadState('networkidle');
-      await page2.waitForTimeout(1000);
-      
-      const kundenkontoLoeschenLink = page2.getByText('Kundenkonto löschen');
-      await kundenkontoLoeschenLink.waitFor({ state: 'visible', timeout: 10000 });
-      await kundenkontoLoeschenLink.click();
-      await page2.waitForTimeout(1500);
-      
-      const checkbox = page2.locator('input[name="terms"][type="checkbox"]');
-      await checkbox.waitFor({ state: 'visible', timeout: 10000 });
-      await checkbox.check();
-      await page2.waitForTimeout(500);
-      
-      const entfernenButton = page2.getByRole('button', { name: 'entfernen', exact: true });
-      await entfernenButton.waitFor({ state: 'visible', timeout: 10000 });
-      await entfernenButton.click();
-      await page2.waitForTimeout(1000);
-      
+
+      await deleteKontoViaSettingsOverview(page2);
+
       console.log('✅ Account gelöscht\n');
       
     } finally {
