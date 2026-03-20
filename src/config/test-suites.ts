@@ -67,6 +67,14 @@ export const TEST_SUITES: TestSuiteConfig[] = [
     description: 'Account Replace Flow - Ersetzen eines bestehenden Accounts\n\n• Test 1: Account Replace mit E-Mail-Adresse (Erstelle Account → Öffne neuen Browser → Klicke "dieser E-Mail-Adresse" → "trotzdem neues Konto erstellen" → Account ersetzen)\n\n• Test 2: Account Replace mit Mobiltelefonnummer (Erstelle Account mit Phone → Öffne neuen Browser → Klicke "dieser Mobiltelefonnummer" → "trotzdem neues Konto erstellen" → Account ersetzen)',
     testCount: 2,
   },
+  {
+    id: 'misc-slack-notification',
+    name: 'Sonstiges - Slack-Benachrichtigung (skip)',
+    path: 'tests/test-slack-notification.spec.ts',
+    description:
+      'Optional: absichtlich fehlschlagender Test für Slack (derzeit test.skip – wird bei „Alle Tests“ mitgeladen, führt aber keinen aktiven Test aus)',
+    testCount: 0,
+  },
 ];
 
 /**
